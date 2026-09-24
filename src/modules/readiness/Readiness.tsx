@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { toast } from 'sonner'
 import {
-  ArrowRight, Check, ChevronLeft, ClipboardCheck, Compass, Landmark, ListPlus, RotateCcw, Scale, ScanFace, Sparkles, type LucideIcon,
+  ArrowRight, Check, ChevronLeft, ClipboardCheck, Compass, Landmark, ListPlus, RotateCcw, Route, Scale, ScanFace, Sparkles, type LucideIcon,
 } from 'lucide-react'
 import { Button, Card, Chip, toneText } from '@/design/ui'
 import { useApp } from '@/store/app'
@@ -146,7 +146,7 @@ function Intro({ onStart, onFresh, onSkip }: { onStart: () => void; onFresh: () 
       <div className="mt-5 grid gap-4 md:grid-cols-3">
         {[
           { icon: Sparkles, title: `Pre-filled for ${school.shortName}`, body: 'From your admission records, vendor list and settings. Change anything that isn’t right.' },
-          { icon: Landmark, title: 'Exemptions recognised', body: 'Attendance, child-safety CCTV and the school bus are recognised as school exemptions, so no extra forms.' },
+          { icon: Route, title: 'Only what applies to you', body: 'Questions branch on your answers. No CCTV means no CCTV questions.' },
           { icon: ListPlus, title: 'A plan, not a score', body: 'Every item lands in one of four buckets, with an owner and a due date. Nothing to grade.' },
         ].map((x, i) => (
           <Rise key={x.title} i={2 + i}>

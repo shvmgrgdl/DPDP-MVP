@@ -126,13 +126,20 @@ function getLib(): Promise<FaceApi> {
 
 const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/'
 
-function hasWebGL() {
-  try {
-    const c = document.createElement('canvas')
-    return !!(c.getContext('webgl2') || c.getContext('webgl'))
-  } catch {
-    return false
+/** 'hw' = GPU-accelerated WebGL, 'sw' = software WebGL only (e.g. no GPU), 'none' = no WebGL. */
+function webglSupport(): 'hw' | 'sw' | 'none' {
+  const probe = (attrs?: WebGLContextAttributes) => {
+    try {
+      const a = document.createElement('canvas')
+      if (a.getContext('webgl2', attrs)) return true
+      const b = document.createElement('canvas')
+      return !!b.getContext('webgl', attrs)
+    } catch {
+      return false
+    }
   }
+  if (probe({ failIfMajorPerformanceCaveat: true })) return 'hw'
+  return probe() ? 'sw' : 'none'
 }
 
 async function reachable(url: string, ms = 3000) {
@@ -165,16 +172,17 @@ async function tryBackend(tf: TfRuntime, name: string): Promise<boolean> {
   }
 }
 
-/** GPU first; WASM (from CDN, only if reachable); software WebGL; plain CPU last. */
+/** GPU WebGL first; WASM (from CDN, only if reachable); software WebGL; plain CPU last. */
 async function initBackend(fa: FaceApi): Promise<string> {
   const tf = fa.tf as unknown as TfRuntime
-  const gl = hasWebGL()
-  if (gl && (await tryBackend(tf, 'webgl'))) return 'webgl'
+  const gl = webglSupport()
+  if (gl === 'hw' && (await tryBackend(tf, 'webgl'))) return 'webgl'
   if (tf.setWasmPaths && tf.findBackendFactory('wasm') && (await reachable(`${WASM_CDN}tfjs-backend-wasm-simd.wasm`))) {
     tf.setWasmPaths(WASM_CDN)
     if (await tryBackend(tf, 'wasm')) return 'wasm'
   }
-  if (gl) {
+  if (gl === 'sw') {
+    // must be set before TF.js first probes WebGL (it caches the result)
     try { tf.env().set('SOFTWARE_WEBGL_ENABLED', true) } catch { /* older tfjs */ }
     if (await tryBackend(tf, 'webgl')) return 'webgl'
   }
