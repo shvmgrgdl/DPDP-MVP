@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/* School DPDP OS — "calm trust, warmed up" tokens (Stitch navy/azure + warm neutrals) */
+@theme {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces Variable", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-deva: "Noto Sans Devanagari", "Public Sans", sans-serif;
+
+  --color-canvas: #f7f6f2;
+  --color-surface: #ffffff;
+  --color-sunken: #f1efe9;
+  --color-line: #e7e4dc;
+  --color-line-strong: #d6d2c7;
+  --color-ink: #0b1c30;
+  --color-ink-2: #3f4550;
+  --color-ink-3: #5f6570;
+  --color-navy: #131b2e;
+  --color-navy-2: #213145;
+  --color-azure: #0051d5;
+  --color-azure-600: #003ea8;
+  --color-azure-50: #eef2ff;
+  --color-azure-100: #dbe1ff;
+
+  --color-ok: #0e6b4b;
+  --color-ok-bg: #e3f3eb;
+  --color-warn: #8a5300;
+  --color-warn-bg: #fdf0d9;
+  --color-risk: #b42318;
+  --color-risk-bg: #fde7e4;
+  --color-info: #1d4ed8;
+  --color-info-bg: #e6eeff;
+  --color-expert: #5b34c9;
+  --color-expert-bg: #efeafd;
+  --color-muted-bg: #eeede8;
+  --color-marigold: #e8a317;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  --shadow-card: 0 1px 2px rgba(11, 28, 48, 0.04), 0 10px 20px rgba(11, 28, 48, 0.04);
+  --shadow-pop: 0 12px 32px rgba(11, 28, 48, 0.12);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    font-feature-settings: "tnum" 0;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-azure);
+    outline-offset: 2px;
+  }
+  [lang="hi"],
+  .deva {
+    font-family: var(--font-deva);
+  }
+  ::selection {
+    background: var(--color-azure-100);
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-line rounded-xl;
+    box-shadow: var(--shadow-card);
+  }
+  .label-caps {
+    @apply text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* frosted face blur used on thumbnails */
+.face-frost {
+  backdrop-filter: blur(10px) saturate(0.9);
+  -webkit-backdrop-filter: blur(10px) saturate(0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+.scanline {
+  animation: scanline 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+}
