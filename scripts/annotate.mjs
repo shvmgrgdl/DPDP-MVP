@@ -495,19 +495,34 @@ async function main() {
     if (Number.isFinite(LIMIT)) allPhotoEntries = allPhotoEntries.slice(0, LIMIT)
 
     console.log(`Detecting faces in ${allPhotoEntries.length} photos (${eventPhotos.length} in events/, ${heldBackPhotos.length} already held back)...`)
-    for (const [idx, entry] of allPhotoEntries.entries()) {
-      try {
-        const det = await detectOnSrc(page, entry.url)
-        const kept = det.faces.filter((f) => f.w / det.width >= MIN_FACE_WIDTH_FRAC)
-        kept.forEach((f) => { f.adult = f.age >= ADULT_AGE })
-        markMain(kept)
-        entry.w = det.width; entry.h = det.height; entry.faces = kept
-        console.log(`  [${idx + 1}/${allPhotoEntries.length}] ${entry.file}: ${kept.length}/${det.faces.length} kept faces`)
-      } catch (e) {
-        console.warn(`  ! ${entry.file} failed: ${e.message}`)
-        entry.w = 0; entry.h = 0; entry.faces = []
-      }
+    // Parallel pool: one page per worker (CPU-bound software WebGL; ~4x faster on 4 cores)
+    const WORKERS = Number(process.env.WORKERS ?? 4)
+    const pages = [page]
+    for (let i = 1; i < WORKERS; i++) {
+      const pg = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+      await pg.goto(`${BASE}/models/face-api/ssd_mobilenetv1_model-weights_manifest.json`, { waitUntil: 'domcontentloaded' })
+      await pg.addScriptTag({ path: path.join(ROOT, 'node_modules/@vladmandic/face-api/dist/face-api.js') })
+      await loadModels(pg)
+      pages.push(pg)
     }
+    let next = 0, done = 0
+    await Promise.all(pages.map(async (pg) => {
+      while (next < allPhotoEntries.length) {
+        const idx = next++
+        const entry = allPhotoEntries[idx]
+        try {
+          const det = await detectOnSrc(pg, entry.url)
+          const kept = det.faces.filter((f) => f.w / det.width >= MIN_FACE_WIDTH_FRAC)
+          kept.forEach((f) => { f.adult = f.age >= ADULT_AGE })
+          markMain(kept)
+          entry.w = det.width; entry.h = det.height; entry.faces = kept
+          console.log(`  [${++done}/${allPhotoEntries.length}] ${entry.file}: ${kept.length}/${det.faces.length} kept faces`)
+        } catch (e) {
+          console.warn(`  ! ${entry.file} failed: ${e.message}`)
+          entry.w = 0; entry.h = 0; entry.faces = []
+        }
+      }
+    }))
 
     console.log('Clustering child faces across all photos...')
     const clusters = clusterChildFaces(allPhotoEntries, CLUSTER_DIST)
