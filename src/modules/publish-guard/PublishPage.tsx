@@ -138,7 +138,8 @@ export default function PublishPage() {
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="min-w-0 space-y-6">
           <EventSelect events={events} photosByEvent={photosByEvent} value={eventId} onChange={(id) => setQuery({ event: id })} />
-          <DestinationPicker value={dest} onChange={(k) => setQuery({ dest: k })} canGo={canGo} total={photos.length} />
+          <div className="hidden xl:block"><DestinationPicker value={dest} onChange={(k) => setQuery({ dest: k })} canGo={canGo} total={photos.length} /></div>
+          <div className="xl:hidden"><DestinationChips value={dest} onChange={(k) => setQuery({ dest: k })} canGo={canGo} total={photos.length} /></div>
         </aside>
 
         <section className="min-w-0" aria-live="polite">
@@ -171,6 +172,7 @@ export default function PublishPage() {
                   <ArrowRight className="size-4 text-ink-3" />
                   <span className="inline-flex items-center gap-1.5"><DestIcon dest={dest} className="size-[18px]" />{d.label}</span>
                 </div>
+                <p className="mt-1 text-[13px] text-ink-2 xl:hidden">{DEST_INFO[dest].meaning}. {DEST_INFO[dest].audience}.</p>
                 <p className="mt-1 text-[13px] text-ink-3">
                   Checked <span className="num">{photos.length}</span> photos and <span className="num">{faceCount}</span> faces against each parent’s choice for “{purposeLabel(dest)}”.
                 </p>
@@ -301,6 +303,33 @@ function DestinationPicker({ value, onChange, canGo, total }: { value: Destinati
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
               {g.dests.map((k) => (
                 <DestCard key={k} dest={k} selected={value === k} onSelect={() => onChange(k)} canGo={canGo[k]} total={total} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Compact picker for tablet widths: the same groups as chips, so the results stay near the top. */
+function DestinationChips({ value, onChange, canGo, total }: { value: DestinationKey; onChange: (k: DestinationKey) => void; canGo: Record<DestinationKey, number>; total: number }) {
+  return (
+    <div>
+      <div className="label-caps mb-2">2 · Destination</div>
+      <div role="radiogroup" aria-label="Destination" className="flex flex-wrap gap-x-5 gap-y-3">
+        {DEST_GROUPS.map((g) => (
+          <div key={g.key} className="min-w-0">
+            <div className="mb-1 text-[11.5px] font-semibold text-ink-3">{g.label}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {g.dests.map((k) => (
+                <button key={k} type="button" role="radio" aria-checked={value === k} onClick={() => onChange(k)} title={`${DEST[k].label}: ${DEST_INFO[k].meaning}`}
+                  className={cn('inline-flex h-9 items-center gap-1.5 rounded-lg border bg-surface px-2.5 text-[13px] font-semibold transition-[border-color,box-shadow]',
+                    value === k ? 'border-azure text-ink shadow-[0_0_0_3px_rgba(0,81,213,0.14)]' : 'border-line text-ink-2 hover:border-line-strong')}>
+                  <DestIcon dest={k} className="size-4" />
+                  {DEST[k].short}
+                  {total > 0 && <span className={cn('text-[11px] num', canGo[k] === 0 ? 'text-risk' : 'text-ink-3')}>{canGo[k]}/{total}</span>}
+                </button>
               ))}
             </div>
           </div>
