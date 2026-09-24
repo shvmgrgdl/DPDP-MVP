@@ -8,7 +8,7 @@ import { MEDIA_PURPOSES } from '../reference'
 import { FIRST_F, FIRST_M, HOUSES, PARENT_F, PARENT_M, SURNAMES } from './names'
 import { addDays, addHours, DEMO_NOW, pick, rng, sha256 } from '@/lib/utils'
 
-export interface ManifestFace { box: [number, number, number, number]; person: string | null; score: number; main?: boolean }
+export interface ManifestFace { box: [number, number, number, number]; person: string | null; score: number; main?: boolean; adult?: boolean }
 export interface ManifestAsset { id: string; event: string; src: string; w: number; h: number; faces: ManifestFace[]; title?: string }
 export interface ManifestVideo {
   id: string; event: string; src: string; w: number; h: number; duration: number; fps: number; title?: string
@@ -255,7 +255,7 @@ export function createSeed(): AppData {
   // ---------- media from manifest ----------
   const m = manifest as unknown as Manifest
   const freq = new Map<string, number>()
-  for (const a of m.assets) for (const f of a.faces) if (f.person) freq.set(f.person, (freq.get(f.person) ?? 0) + 1)
+  for (const a of m.assets) for (const f of a.faces) if (f.person && !f.adult) freq.set(f.person, (freq.get(f.person) ?? 0) + 1)
   for (const v of m.videos) for (const t of v.tracks) if (t.person) freq.set(t.person, (freq.get(t.person) ?? 0) + 1)
   const persons = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p)
   const personToStudent = new Map<string, string | null>()
@@ -273,8 +273,9 @@ export function createSeed(): AppData {
       id: a.id, eventId: ev0.id, kind: 'photo', src: a.src, w: a.w, h: a.h, title: a.title,
       capturedAt: addHours(ev0.date, Math.floor(r() * 3)), uploadedBy: ev0.photographerIds[0] ?? 'U-MKT',
       faces: a.faces.map((f, i) => {
+        if (f.adult) return { id: `${a.id}-f${i}`, box: f.box, studentId: null, confidence: 0, review: 'non-student' as const, main: !!f.main }
         const sidm = f.person ? personToStudent.get(f.person) ?? null : null
-        return { id: `${a.id}-f${i}`, box: f.box, studentId: sidm, confidence: sidm ? Math.min(0.99, 0.9 + f.score * 0.09) : 0, review: sidm ? 'auto' : 'unknown', main: !!f.main }
+        return { id: `${a.id}-f${i}`, box: f.box, studentId: sidm, confidence: sidm ? Math.min(0.99, 0.9 + f.score * 0.09) : 0, review: sidm ? ('auto' as const) : ('unknown' as const), main: !!f.main }
       }),
     })
   }
