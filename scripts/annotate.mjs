@@ -494,8 +494,7 @@ async function main() {
     let allPhotoEntries = [...eventPhotos, ...heldBackPhotos]
     if (Number.isFinite(LIMIT)) allPhotoEntries = allPhotoEntries.slice(0, LIMIT)
 
-    console.log(`Detecting faces in ${allPhotoEntries.length} photos (${eventPhotos.length} in events/, ${heldBackPhotos.length} already held back)...`)
-    // Parallel pool: one page per worker (CPU-bound software WebGL; ~4x faster on 4 cores)
+    console.log(`Detecting faces in ${allPhotoEntries.length} photos...`)
     const WORKERS = Number(process.env.WORKERS ?? 4)
     const pages = [page]
     for (let i = 1; i < WORKERS; i++) {
@@ -508,19 +507,15 @@ async function main() {
     let next = 0, done = 0
     await Promise.all(pages.map(async (pg) => {
       while (next < allPhotoEntries.length) {
-        const idx = next++
-        const entry = allPhotoEntries[idx]
+        const entry = allPhotoEntries[next++]
         try {
           const det = await detectOnSrc(pg, entry.url)
           const kept = det.faces.filter((f) => f.w / det.width >= MIN_FACE_WIDTH_FRAC)
           kept.forEach((f) => { f.adult = f.age >= ADULT_AGE })
           markMain(kept)
           entry.w = det.width; entry.h = det.height; entry.faces = kept
-          console.log(`  [${++done}/${allPhotoEntries.length}] ${entry.file}: ${kept.length}/${det.faces.length} kept faces`)
-        } catch (e) {
-          console.warn(`  ! ${entry.file} failed: ${e.message}`)
-          entry.w = 0; entry.h = 0; entry.faces = []
-        }
+          console.log(`  [${++done}/${allPhotoEntries.length}] ${entry.file}: ${kept.length} faces`)
+        } catch (e) { console.warn(`  ! ${entry.file} failed: ${e.message}`); entry.w = 0; entry.h = 0; entry.faces = [] }
       }
     }))
 
@@ -665,7 +660,7 @@ async function main() {
     if (!SKIP_VIDEO) {
       fs.writeFileSync(VIDEO_INDEX_PATH, JSON.stringify(manifestVideos))
     }
-    const manifest = { version: 1, generatedAt: new Date().toISOString(), assets: manifestAssets, videos: SKIP_VIDEO ? JSON.parse(fs.existsSync(VIDEO_INDEX_PATH) ? fs.readFileSync(VIDEO_INDEX_PATH, 'utf8') : '[]') : manifestVideos }
+    const manifest = { version: 1, generatedAt: new Date().toISOString(), assets: manifestAssets, videos: SKIP_VIDEO ? (JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8')).videos ?? []).filter((v) => typeof v === 'object') : manifestVideos }
     fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest))
     fs.writeFileSync(DESCRIPTORS_PATH, JSON.stringify(descriptorsOut))
 

@@ -43,7 +43,7 @@ export interface AppData {
   faceIndex: Record<string, string | null>
 }
 
-export const DATA_VERSION = 9
+export const DATA_VERSION = 10
 export const pkey = (studentId: string, purpose: MediaPurposeKey) => `${studentId}|${purpose}`
 
 /** Hero students in Class 5B. Order = assignment priority onto the most frequent faces in the media manifest. */

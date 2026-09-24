@@ -101,7 +101,7 @@ function StudioInner({ entry }: { entry: VideoEntry }) {
   const setBlurEveryone = (v: boolean) => { setBlurEveryoneState(v); setOverrides({}) }
 
   // ---- face tracks: pre-computed from the media manifest, or found live in this browser ----
-  const precomputed = entry.tracks !== undefined
+  const precomputed = !!entry.tracks && entry.tracks.length > 0
   const scan = useStudio((s) => s.scans[entry.id])
   const thumbs = useStudio((s) => s.thumbs[entry.id])
   React.useEffect(() => { if (!precomputed) startScan(entry) }, [entry, precomputed])
