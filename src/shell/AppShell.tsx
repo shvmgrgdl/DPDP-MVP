@@ -46,7 +46,7 @@ function Sidebar() {
     home: tasks.filter((t) => t.status === 'open' && t.kind === 'approval').length,
   }
   return (
-    <aside className="no-print hidden lg:flex w-[248px] shrink-0 flex-col border-r border-line bg-[#fbfaf7]">
+    <aside className="no-print sticky top-0 hidden h-screen lg:flex w-[248px] shrink-0 flex-col border-r border-line bg-[#fbfaf7]">
       <button type="button" className="flex items-center gap-3 px-5 pt-5 pb-4 text-left"
         onClick={() => { clicks.current++; if (clicks.current >= 5) { clicks.current = 0; setUI({ directorOpen: true }) } }}>
         <BrandMark />
@@ -219,7 +219,7 @@ export function AppShell() {
     return (<GuestFrame label={def.label}><main className="mx-auto max-w-[1200px] px-6 py-8"><Outlet /></main>{overlays}</GuestFrame>)
   }
   return (
-    <div className="flex h-full">
+    <div className="flex min-h-full">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />

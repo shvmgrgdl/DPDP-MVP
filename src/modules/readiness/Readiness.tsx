@@ -471,7 +471,14 @@ export function Readiness() {
   const advanceTimer = React.useRef<number | undefined>(undefined)
 
   const visible = React.useMemo(() => visibleQuestions(answers), [answers])
-  const idx = Math.max(0, visible.findIndex((q) => q.id === current))
+  // If the current question was just hidden by an answer, fall forward to the next visible one.
+  const idx = React.useMemo(() => {
+    const i = visible.findIndex((x) => x.id === current)
+    if (i >= 0) return i
+    const order = QUESTIONS.findIndex((x) => x.id === current)
+    const after = visible.findIndex((x) => QUESTIONS.indexOf(x) > order)
+    return after >= 0 ? after : visible.length - 1
+  }, [visible, current])
   const q = visible[idx]
   const include = React.useCallback((x: Question) => seen.has(x.id), [seen])
   const live = React.useMemo(() => recognise(answers, include), [answers, include])
@@ -495,6 +502,8 @@ export function Readiness() {
     else { setSeen(new Set(visible.map((x) => x.id))); setStage('results'); window.scrollTo({ top: 0 }) }
   }, [visible, idx, q]) // eslint-disable-line react-hooks/exhaustive-deps
   const back = () => { const p = visible[idx - 1]; if (p) goTo(p.id, -1) }
+  const nextRef = React.useRef(next)
+  React.useEffect(() => { nextRef.current = next })
 
   const pick = (value: string) => {
     if (!q) return
@@ -507,7 +516,7 @@ export function Readiness() {
     } else {
       setAnswers((a) => ({ ...a, [q.id]: [value] }))
       window.clearTimeout(advanceTimer.current)
-      advanceTimer.current = window.setTimeout(() => next(), 320)
+      advanceTimer.current = window.setTimeout(() => nextRef.current(), 320)
     }
   }
 

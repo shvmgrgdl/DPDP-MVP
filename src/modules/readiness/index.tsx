@@ -1,19 +1,12 @@
-import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
+import { Navigate, Route, Routes } from 'react-router'
+import { Readiness } from './Readiness'
 
-function Placeholder() {
-  return (
-    <div>
-      <PageHeader eyebrow="Readiness" title="DPDP readiness check" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
-    </div>
-  )
-}
-
-export default function Module() {
+/** Readiness Engine — mounted at /readiness/*. */
+export default function ReadinessModule() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route index element={<Readiness />} />
+      <Route path="*" element={<Navigate to="/readiness" replace />} />
     </Routes>
   )
 }
