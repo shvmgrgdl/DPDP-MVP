@@ -11,7 +11,7 @@
  *   useFaceEngine: zustand hook → { status: 'idle'|'loading'|'ready'|'error', progress 0..1, stage, backend, error? }
  *   modelsReady(): boolean · getBackend(): string | null
  *   detectFaces(input: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, opts?) → Promise<DetectedFace[]>
- *       opts: { minConfidence = 0.35, descriptors = true, maxResults = 100, tiles = 'auto', detector = 'ssd', inputSize = 416 }
+ *       opts: { minConfidence = 0.35, descriptors = true, maxResults = 100, tiles = 'auto', minSize = 0, detector = 'ssd', inputSize = 416 }
  *       DetectedFace = { box: [x, y, w, h] normalised 0..1, score, descriptor?: Float32Array }, sorted largest first.
  *       tiles 'auto' adds overlapping close-up passes on large photos so small faces in group shots are found.
  *       detector 'tiny' (lazy-loaded, no descriptors, no tiles) is for fast video loops.
@@ -53,6 +53,8 @@ export interface DetectOptions {
   detector?: 'ssd' | 'tiny'
   /** Tiny detector input size (multiple of 32). */
   inputSize?: number
+  /** Drop faces narrower than this fraction of the image width (e.g. 0.018 ≈ too small to recognise). Default 0. */
+  minSize?: number
 }
 
 export interface FaceMatch {
@@ -226,6 +228,19 @@ async function doLoadModels(): Promise<FaceEngineInfo> {
     setEngine(stage ? { progress, stage } : { progress })
   }
   setEngine({ status: 'loading', progress, stage: 'Loading the face engine', error: undefined })
+  // gentle creep so a slow network or GPU warm-up never looks frozen
+  const creep = setInterval(() => {
+    progress = Math.min(0.96, progress + (0.96 - progress) * 0.035)
+    setEngine({ progress })
+  }, 400)
+  try {
+    return await loadSteps(t0, bump)
+  } finally {
+    clearInterval(creep)
+  }
+}
+
+async function loadSteps(t0: number, bump: (d: number, stage?: string) => void): Promise<FaceEngineInfo> {
   const fa = await getLib()
   bump(0.09, 'Starting TensorFlow in your browser')
   const backend = await initBackend(fa)
@@ -375,7 +390,7 @@ async function locate(fa: FaceApi, input: MediaInput, w: number, h: number, minC
 
 /** Find faces. Boxes are normalised to the input's natural size; results are sorted largest first. */
 export async function detectFaces(input: MediaInput, opts: DetectOptions = {}): Promise<DetectedFace[]> {
-  const { minConfidence = 0.35, descriptors = true, maxResults = 100, detector = 'ssd', inputSize = 416, tiles = 'auto' } = opts
+  const { minConfidence = 0.35, descriptors = true, maxResults = 100, detector = 'ssd', inputSize = 416, tiles = 'auto', minSize = 0 } = opts
   const { w, h } = mediaDims(input)
   if (!w || !h) return []
   const fa = await getLib()
@@ -387,7 +402,7 @@ export async function detectFaces(input: MediaInput, opts: DetectOptions = {}): 
   const info = await loadModels()
   const useTiles = tiles === 'auto' ? Math.max(w, h) >= TILE_MIN_SIDE && info.backend !== 'cpu' : tiles
   return serial(async () => {
-    const boxes = await locate(fa, input, w, h, minConfidence, maxResults, useTiles)
+    const boxes = (await locate(fa, input, w, h, minConfidence, maxResults, useTiles)).filter((b) => b.w >= minSize * w)
     if (!boxes.length) return []
     if (!descriptors) return sortBySize(boxes.map((b) => ({ box: normBox({ x: b.x, y: b.y, width: b.w, height: b.h }, w, h), score: b.score })))
     const dims = { width: w, height: h }

@@ -121,7 +121,8 @@ export function useVideoEntries() {
       .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
       .map((a) => ({
         id: a.id, title: a.title ?? humanise(a.src), src: a.src, origin: 'library', asset: a, eventId: a.eventId, capturedAt: a.capturedAt,
-        duration: a.duration, w: a.w, h: a.h, tracks: a.tracks ?? [], fileName: basename(a.src),
+        // no tracks at all (e.g. a fresh upload) → faces are found live; an empty list means "checked, nobody visible"
+        duration: a.duration, w: a.w, h: a.h, tracks: a.tracks, fileName: basename(a.src),
       }))
     const ids = new Set(lib.map((e) => e.id))
     const srcs = new Set(lib.map((e) => pathOf(e.src)))

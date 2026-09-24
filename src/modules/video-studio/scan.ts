@@ -150,8 +150,6 @@ async function drive(video: HTMLVideoElement, duration: number, cw: number, ch: 
     const signal = () => { const w = wake; wake = null; w?.() }
     let ended = false
     let stalled = false
-    let overshoots = 0
-    let jobs = 0
     let lastCb = performance.now()
 
     const cb = (_now: number, meta: VideoFrameCallbackMetadata) => {
@@ -187,9 +185,8 @@ async function drive(video: HTMLVideoElement, duration: number, cw: number, ch: 
         await sample(t, frame)
         onProgress(t)
         nextT = t + step
-        jobs++
-        // crawled past the next sample point anyway? (very slow detector) → finish by seeking instead
-        if (!ended && video.currentTime > nextT + step * 0.5 && jobs > 2 && ++overshoots >= 2) { stalled = true; break }
+        // crawled past the next sample point anyway? (a very slow detector) → finish by seeking instead
+        if (nextT < duration && video.currentTime > nextT + step * 0.5) { stalled = true; break }
         pending = null
         lastCb = performance.now()
         if (!ended) setRate(FAST)

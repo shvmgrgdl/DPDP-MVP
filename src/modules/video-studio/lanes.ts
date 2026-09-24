@@ -19,6 +19,8 @@ export interface Lane {
   auto: boolean
   locked: boolean
   overridden: boolean
+  /** Safeguarding flag: never shown outside the private parents gallery. */
+  protectedChild: boolean
   frames: Frame[]
   gap: number
   segments: Segment[]
@@ -36,21 +38,41 @@ export const DEST_PHRASE: Record<DestChoice, string> = {
   instagram: 'on Instagram', website: 'on the website', youtube: 'on YouTube', 'private-gallery': 'in the parents gallery',
 }
 export const destLabel = (d: DestChoice) => DEST_CHOICES.find((x) => x.key === d)?.label ?? d
+/** Short form for lane labels. */
+const DEST_SHORT: Record<DestChoice, string> = { instagram: 'on Instagram', website: 'on the website', youtube: 'on YouTube', 'private-gallery': 'in the gallery' }
 
 function reasonFor(ev: FaceEval, face: FaceInstance, dest: DestChoice) {
   const where = DEST_PHRASE[dest]
+  const short = DEST_SHORT[dest]
   if (ev.state === 'ok') {
     if (face.review === 'non-student') return { reason: 'Adult or visitor', detail: 'Marked as an adult or visitor by staff, so no parent permission is needed.' }
-    return { reason: `Allowed ${where}`, detail: `Parent allowed this use ${where}.` }
+    return { reason: `Allowed ${short}`, detail: `Parent allowed this use ${where}.` }
   }
   if (ev.state === 'unknown') return { reason: 'Not recognised', detail: 'We never guess who a face is. Blur it, or confirm who it is in Media Safe.' }
   if (face.review === 'always-blur') return { reason: 'Always blurred', detail: 'Staff marked this face “always blur”.' }
   if (ev.student?.protected) return { reason: 'Protected child', detail: 'Safeguarding flag: this child is never shown outside the private parents gallery.' }
   if (!ev.permission) return { reason: 'No choice recorded yet', detail: 'No parent choice is on record for this use, so the face stays hidden.' }
   if (ev.reason.startsWith('Choice given on an outdated notice')) return { reason: 'Needs re-confirmation', detail: ev.reason }
-  if (ev.permission.status === 'pending') return { reason: 'Parent hasn’t chosen yet', detail: 'The family hasn’t set their choices yet, so the face stays hidden until they do.' }
-  if (ev.permission.status === 'withdrawn') return { reason: 'Parent withdrew permission', detail: `The parent withdrew permission for use ${where}.` }
-  return { reason: `Not allowed ${where}`, detail: `The parent chose not to allow use ${where}.` }
+  if (ev.permission.status === 'pending') return { reason: 'Choices pending', detail: 'The family hasn’t set their choices yet, so the face stays hidden until they do.' }
+  if (ev.permission.status === 'withdrawn') return { reason: 'Permission withdrawn', detail: `The parent withdrew permission for use ${where}.` }
+  return { reason: `Not allowed ${short}`, detail: `The parent chose not to allow use ${where}.` }
+}
+
+const plainReview = (t: SourceTrack) => !t.face || t.face.review === 'auto' || t.face.review === 'confirmed'
+
+/** Re-entries of the same student become one lane. Never merged when they overlap in time (two faces at once must stay two tracks). */
+export function mergeSameStudent(tracks: SourceTrack[]): SourceTrack[] {
+  const out: SourceTrack[] = []
+  for (const tr of [...tracks].filter((t) => t.frames.length).sort((a, b) => a.frames[0][0] - b.frames[0][0])) {
+    const target = tr.studentId && plainReview(tr)
+      ? out.find((o) => o.studentId === tr.studentId && plainReview(o) && o.frames[o.frames.length - 1][0] < tr.frames[0][0] - 0.05)
+      : undefined
+    if (target) {
+      target.frames = [...target.frames, ...tr.frames]
+      target.thumb = target.thumb ?? tr.thumb
+    } else out.push({ ...tr, frames: [...tr.frames] })
+  }
+  return out
 }
 
 /**
@@ -63,8 +85,7 @@ export function buildLanes(
   canNames: boolean, duration: number, thumbs: Record<string, string> | undefined,
 ): Lane[] {
   let childN = 0
-  return tracks
-    .filter((t) => t.frames.length)
+  return mergeSameStudent(tracks)
     .map((tr) => {
       const f0 = tr.frames[0]
       const face: FaceInstance = tr.face ?? {
@@ -89,7 +110,8 @@ export function buildLanes(
       const gap = gapFor(tr.frames)
       return {
         id: tr.id, name, shortName, studentId: student?.id ?? null, tone, reason, detail, blur, auto, locked,
-        overridden: !locked && ov !== undefined && ov !== auto, frames: tr.frames, gap,
+        overridden: !locked && ov !== undefined && ov !== auto, protectedChild: tone === 'blocked' && !!student?.protected && face.review !== 'always-blur',
+        frames: tr.frames, gap,
         segments: segmentsOf(tr.frames, gap, duration), firstT: tr.frames[0][0], thumb: tr.thumb ?? thumbs?.[tr.id],
       }
     })

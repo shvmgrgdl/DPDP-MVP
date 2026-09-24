@@ -7,16 +7,16 @@ import type { Lane } from './lanes'
 import { useTime, type TimeStore } from './player'
 import { fmtClock } from './media'
 
-const GUTTER = 280
+const GUTTER = 300
 
 function tickStep(d: number) {
-  for (const s of [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300]) if (d / s <= 10) return s
+  for (const s of [1, 2, 5, 10, 15, 30, 60, 120, 300]) if (d / s <= 10) return s
   return 600
 }
 
 export interface ScanInfo { active: boolean; progress: number; label: string; error?: string; onRetry?: () => void }
 
-export function Timeline({ lanes, duration, time, onSeek, selectedId, onSelect, onToggle, scan, destWhere }: {
+export function Timeline({ lanes, duration, time, onSeek, selectedId, onSelect, onToggle, scan, destWhere, disabled = false }: {
   lanes: Lane[]
   duration: number
   time: TimeStore
@@ -26,6 +26,8 @@ export function Timeline({ lanes, duration, time, onSeek, selectedId, onSelect, 
   onToggle: (id: string, blur: boolean) => void
   scan: ScanInfo | null
   destWhere: string
+  /** Locks the Blur toggles (while an export is recording). */
+  disabled?: boolean
 }) {
   const d = duration > 0 ? duration : 1
   const ticks = React.useMemo(() => {
@@ -76,7 +78,7 @@ export function Timeline({ lanes, duration, time, onSeek, selectedId, onSelect, 
       <div className="relative">
         {/* ruler */}
         <div className="grid" style={{ gridTemplateColumns: `${GUTTER}px minmax(0,1fr)` }}>
-          <div className="label-caps flex items-center px-5 py-2">Person</div>
+          <div className="label-caps flex items-center justify-between px-5 py-2"><span>Person</span><span className="w-12 text-center">Blur</span></div>
           <div className="relative h-8 cursor-pointer touch-none border-l border-line" {...scrub}>
             {ticks.map((t) => (
               <span key={t} className="absolute bottom-0 top-0 flex items-end" style={{ left: `${(t / d) * 100}%` }}>
@@ -96,7 +98,7 @@ export function Timeline({ lanes, duration, time, onSeek, selectedId, onSelect, 
           </div>
         ) : (
           lanes.map((l) => (
-            <LaneRow key={l.id} lane={l} d={d} selected={l.id === selectedId} onSelect={() => onSelect(l.id)} onToggle={(v) => onToggle(l.id, v)} scrub={scrub} />
+            <LaneRow key={l.id} lane={l} d={d} selected={l.id === selectedId} onSelect={() => onSelect(l.id)} onToggle={(v) => onToggle(l.id, v)} scrub={scrub} disabled={disabled} />
           ))
         )}
         <Playhead time={time} d={d} />
@@ -125,8 +127,9 @@ function Playhead({ time, d }: { time: TimeStore; d: number }) {
 
 const TONE_TEXT = { ok: 'text-ok', blocked: 'text-warn', unknown: 'text-info' } as const
 
-function LaneRow({ lane, d, selected, onSelect, onToggle, scrub }: {
+function LaneRow({ lane, d, selected, onSelect, onToggle, scrub, disabled }: {
   lane: Lane
+  disabled: boolean
   d: number
   selected: boolean
   onSelect: () => void
@@ -148,7 +151,7 @@ function LaneRow({ lane, d, selected, onSelect, onToggle, scrub }: {
             </Tip>
           </span>
         </button>
-        <BlurToggle lane={lane} onToggle={onToggle} />
+        <BlurToggle lane={lane} onToggle={onToggle} disabled={disabled} />
       </div>
       <div className="relative h-[58px] cursor-pointer touch-none border-l border-line" {...scrub}>
         <span className="absolute inset-x-0 top-1/2 h-px bg-line" />
@@ -176,7 +179,7 @@ function FaceThumb({ lane }: { lane: Lane }) {
   )
 }
 
-function BlurToggle({ lane, onToggle }: { lane: Lane; onToggle: (v: boolean) => void }) {
+function BlurToggle({ lane, onToggle, disabled }: { lane: Lane; onToggle: (v: boolean) => void; disabled: boolean }) {
   if (lane.locked) {
     return (
       <Tip content={`${lane.detail} This face is always blurred for this destination.`}>
@@ -188,9 +191,8 @@ function BlurToggle({ lane, onToggle }: { lane: Lane; onToggle: (v: boolean) => 
     )
   }
   return (
-    <label className="flex shrink-0 items-center gap-2 text-[12px] font-semibold text-ink-2">
-      Blur
-      <Switch checked={lane.blur} onCheckedChange={onToggle} label={`Blur ${lane.name}`} />
-    </label>
+    <span className="shrink-0">
+      <Switch checked={lane.blur} onCheckedChange={onToggle} label={`Blur ${lane.name}`} disabled={disabled} />
+    </span>
   )
 }

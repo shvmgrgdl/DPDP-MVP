@@ -212,7 +212,8 @@ function makeSession(mode: Mode) {
         useSession.setState((s) => ({ items: s.items.map((i) => (i.key === item.key || i.phase === 'queued' ? { ...i, phase: 'error', error: err, engineError: true } : i)) }))
         return false
       }
-      const detected = await detectFaces(img.canvas, { minConfidence: 0.35, descriptors: true })
+      // faces narrower than ~1.8% of the width are too small to recognise anyone (same idea as the library annotator)
+      const detected = await detectFaces(img.canvas, { minConfidence: 0.35, descriptors: true, minSize: 0.018 })
       const faces: XFace[] = detected.map((d, i) => ({
         id: `f${i}`, box: d.box, score: d.score, personId: null, studentId: null, distance: null, confidence: 0, main: i === 0, crop: cropFace(img.canvas, d.box),
       }))

@@ -197,7 +197,7 @@ function Stage({ item, items, live }: { item: XItem; items: XItem[]; live: boole
               <span className="text-[12px] text-ink-3 num">Checked in {(item.ms / 1000).toFixed(1)} s</span>
             ) : null}
           </div>
-          <PipelineSteps item={item} names={names} hoverFace={hoverFace} onHoverFace={setHoverFace} ahead={items.slice(0, index).filter((i) => i.phase === 'queued').length} />
+          <PipelineSteps item={item} names={names} hoverFace={hoverFace} onHoverFace={setHoverFace} ahead={items.slice(0, index).filter((i) => i.phase !== 'done' && i.phase !== 'error').length} />
         </div>
       </div>
     </Card>

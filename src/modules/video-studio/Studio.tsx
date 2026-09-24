@@ -21,7 +21,7 @@ import type { DrawFace, RenderParams } from './render'
 import { fmtBytes, fmtClock } from './media'
 import { Stage } from './Stage'
 import { Timeline, type ScanInfo } from './Timeline'
-import { SharePanel, type ExportState } from './SharePanel'
+import { SharePanel, ViewPanel, type ExportState } from './SharePanel'
 import { useOpenVideo } from './open'
 import type { DestChoice, Frame, SourceTrack, VideoEntry } from './types'
 
@@ -73,15 +73,18 @@ function StudioInner({ entry }: { entry: VideoEntry }) {
   const canExportAbility = useCan('export')
   const canPublish = useCan('publish')
   const canExport = canExportAbility || canPublish
-  const role = useApp((s) => s.role)
   const event = useApp((s) => s.events.find((e) => e.id === entry.eventId))
   const engine = useFaceEngine()
   const open = useOpenVideo()
   const navigate = useNavigate()
 
+  // Destination lives in state (an urgent update) so the export always uses what is on screen;
+  // the ?for= URL parameter only mirrors it (router updates are low-priority transitions).
   const [search, setSearch] = useSearchParams()
-  const forParam = search.get('for')
-  const dest: DestChoice = DEST_CHOICES.some((d) => d.key === forParam) ? (forParam as DestChoice) : 'instagram'
+  const [dest, setDestState] = React.useState<DestChoice>(() => {
+    const p = search.get('for')
+    return DEST_CHOICES.some((d) => d.key === p) ? (p as DestChoice) : 'instagram'
+  })
   const [blurEveryone, setBlurEveryoneState] = React.useState(true)
   const [overrides, setOverrides] = React.useState<Record<string, boolean>>({})
   const [style, setStyle] = React.useState<BlurStyle>('soft')
@@ -91,8 +94,9 @@ function StudioInner({ entry }: { entry: VideoEntry }) {
   const [exportState, setExportState] = React.useState<ExportState>({ phase: 'idle' })
 
   const setDest = (d: DestChoice) => {
-    setSearch((p) => { const n = new URLSearchParams(p); n.set('for', d); return n }, { replace: true })
+    setDestState(d)
     setOverrides({})
+    setSearch((p) => { const n = new URLSearchParams(p); n.set('for', d); return n }, { replace: true })
   }
   const setBlurEveryone = (v: boolean) => { setBlurEveryoneState(v); setOverrides({}) }
 
@@ -160,7 +164,9 @@ function StudioInner({ entry }: { entry: VideoEntry }) {
     return null
   }, [precomputed, scan, engine.status, engine.progress, engine.stage, entry])
 
-  const stageScan = scanInfo?.active ? { active: true, progress: scanInfo.progress, label: `Finding faces · ${Math.round(scanInfo.progress * 100)}%` } : null
+  const stageScan = scanInfo?.active
+    ? { active: true, progress: scanInfo.progress, label: scan?.status === 'scanning' ? `Finding faces · ${Math.round(scanInfo.progress * 100)}%` : 'Starting the face finder…' }
+    : null
 
   // ---- export ----
   const abortRef = React.useRef<AbortController | null>(null)
@@ -192,6 +198,7 @@ function StudioInner({ entry }: { entry: VideoEntry }) {
         signal: ac.signal,
         onProgress: (p) => setExportState((s) => (s.phase === 'running' ? { phase: 'running', progress: p } : s)),
       })
+      if (res.blob.size < 1024) throw new Error('The recording came out empty. Keep this tab in front while exporting and try again.')
       if (urlRef.current) URL.revokeObjectURL(urlRef.current)
       const url = URL.createObjectURL(res.blob)
       urlRef.current = url
@@ -249,7 +256,14 @@ function StudioInner({ entry }: { entry: VideoEntry }) {
     <div>
       {open.input}
       <PageHeader eyebrow={<BackLink />} title={entry.title} subtitle={subtitle}
-        actions={<Button variant="secondary" icon={<FolderOpen className="size-4" />} onClick={open.open} disabled={player.state.exporting}>Open another video…</Button>} />
+        actions={<>
+          <Button variant="secondary" icon={<FolderOpen className="size-4" />} onClick={open.open} disabled={player.state.exporting}>Open another video…</Button>
+          {/* narrow screens: the share panel sits below the timeline, so the main action is repeated up here */}
+          <Button className="xl:hidden" icon={<ShieldCheck className="size-4" />} onClick={() => void onExport()}
+            disabled={!!exportBlock || !canExport || exportState.phase === 'running'}>
+            {exportState.phase === 'running' ? `Exporting · ${Math.round(exportState.progress * 100)}%` : 'Export protected video'}
+          </Button>
+        </>} />
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-5">
@@ -257,15 +271,15 @@ function StudioInner({ entry }: { entry: VideoEntry }) {
             scan={stageScan} blurredCount={lanes.filter((l) => l.blur).length} spans={spans} />
           <Timeline lanes={lanes} duration={duration} time={player.time} onSeek={(t) => { if (!player.state.exporting) player.seek(t) }}
             selectedId={selected} onSelect={onSelect} destWhere={DEST_PHRASE[dest]}
-            onToggle={(id, v) => setOverrides((o) => ({ ...o, [id]: v }))} scan={scanInfo} />
+            onToggle={(id, v) => setOverrides((o) => ({ ...o, [id]: v }))} scan={scanInfo} disabled={player.state.exporting} />
         </div>
         <div className="space-y-4">
           <SharePanel dest={dest} setDest={setDest} lanes={lanes} blurEveryone={blurEveryone} setBlurEveryone={setBlurEveryone}
-            outlines={outlines} setOutlines={setOutlines} style={style} setStyle={setStyle}
             exportState={exportState} onExport={() => void onExport()} onCancel={() => abortRef.current?.abort()}
             onDownload={() => { if (exportState.phase === 'done') download(exportState.url, exportState.fileName) }}
             onReset={() => setExportState({ phase: 'idle' })} exportBlock={exportBlock} canExport={canExport}
             onBlurUnknown={() => setBlurEveryone(true)} />
+          <ViewPanel outlines={outlines} setOutlines={setOutlines} style={style} setStyle={setStyle} disabled={exportState.phase === 'running'} />
           <HowItWorks precomputed={precomputed} onLibrary={() => navigate('/video')} />
         </div>
       </div>

@@ -35,18 +35,13 @@ export type ExportState =
   | { phase: 'error'; message: string }
 
 export function SharePanel({
-  dest, setDest, lanes, blurEveryone, setBlurEveryone, outlines, setOutlines, style, setStyle,
-  exportState, onExport, onCancel, onDownload, onReset, exportBlock, canExport, onBlurUnknown,
+  dest, setDest, lanes, blurEveryone, setBlurEveryone, exportState, onExport, onCancel, onDownload, onReset, exportBlock, canExport, onBlurUnknown,
 }: {
   dest: DestChoice
   setDest: (d: DestChoice) => void
   lanes: Lane[]
   blurEveryone: boolean
   setBlurEveryone: (v: boolean) => void
-  outlines: boolean
-  setOutlines: (v: boolean) => void
-  style: BlurStyle
-  setStyle: (s: BlurStyle) => void
   exportState: ExportState
   onExport: () => void
   onCancel: () => void
@@ -60,8 +55,8 @@ export function SharePanel({
   const blurred = lanes.filter((l) => l.blur).length
   const counts = {
     allowed: lanes.filter((l) => l.tone === 'ok').length,
-    notAllowed: lanes.filter((l) => l.tone === 'blocked' && l.reason !== 'Protected child').length,
-    protectedKids: lanes.filter((l) => l.reason === 'Protected child').length,
+    notAllowed: lanes.filter((l) => l.tone === 'blocked' && !l.protectedChild).length,
+    protectedKids: lanes.filter((l) => l.protectedChild).length,
     unknown: lanes.filter((l) => l.tone === 'unknown').length,
   }
   const unknownShown = lanes.filter((l) => l.tone === 'unknown' && !l.blur).length
@@ -73,7 +68,7 @@ export function SharePanel({
       <div className="mt-2.5 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Destination">
         {DEST_CHOICES.map((d) => (
           <button key={d.key} type="button" role="radio" aria-checked={dest === d.key} disabled={running} onClick={() => setDest(d.key)}
-            className={cn('flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-[13px] font-semibold transition-colors disabled:opacity-50',
+            className={cn('flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-[13px] font-semibold transition-colors disabled:opacity-50',
               dest === d.key ? 'border-azure bg-azure-50 text-azure ring-1 ring-azure' : 'border-line-strong bg-surface text-ink-2 hover:bg-sunken')}>
             <span className={cn('flex size-7 items-center justify-center rounded-lg', dest === d.key ? 'bg-white text-azure' : 'bg-sunken text-ink-2')}>{DEST_ICON[d.key]}</span>
             {d.label}
@@ -81,7 +76,7 @@ export function SharePanel({
         ))}
       </div>
 
-      <div className="mt-5 rounded-xl bg-[#fbfaf7] p-4 ring-1 ring-inset ring-line">
+      <div className="mt-4 rounded-xl bg-[#fbfaf7] p-4 ring-1 ring-inset ring-line">
         {total ? (
           <>
             <div className="flex items-baseline gap-2">
@@ -111,27 +106,40 @@ export function SharePanel({
         </div>
       )}
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-4">
         <ToggleRow title="Blur everyone without permission" body="Also hides faces we couldn’t match to a student." checked={blurEveryone} onChange={setBlurEveryone} disabled={running} />
+      </div>
+
+      <Divider className="my-4" />
+      <ExportBox state={exportState} onExport={onExport} onCancel={onCancel} onDownload={onDownload} onReset={onReset} block={exportBlock} canExport={canExport} destWhere={DEST_PHRASE[dest]} />
+    </Card>
+  )
+}
+
+/** How the preview looks: outlines (never exported) and the blur style (exported). */
+export function ViewPanel({ outlines, setOutlines, style, setStyle, disabled }: {
+  outlines: boolean
+  setOutlines: (v: boolean) => void
+  style: BlurStyle
+  setStyle: (s: BlurStyle) => void
+  disabled: boolean
+}) {
+  return (
+    <Card className="p-5">
+      <div className="label-caps">Blur style</div>
+      <div className="mt-2.5 grid grid-cols-4 gap-2">
+        {STYLES.map((s) => (
+          <button key={s.key} type="button" onClick={() => setStyle(s.key)} disabled={disabled} aria-pressed={style === s.key}
+            className={cn('flex flex-col items-center gap-1.5 rounded-xl border px-1 py-2.5 text-[11.5px] font-semibold transition-colors disabled:opacity-50',
+              style === s.key ? 'border-azure bg-azure-50 text-azure ring-1 ring-azure' : 'border-line-strong text-ink-2 hover:bg-sunken')}>
+            <span className="size-7">{s.swatch}</span>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4">
         <ToggleRow title="Show face outlines" body="Soft outlines to check the tracking. Never included in the export." checked={outlines} onChange={setOutlines} />
       </div>
-
-      <div className="mt-5">
-        <div className="label-caps">Blur style</div>
-        <div className="mt-2.5 grid grid-cols-4 gap-2">
-          {STYLES.map((s) => (
-            <button key={s.key} type="button" onClick={() => setStyle(s.key)} disabled={running} aria-pressed={style === s.key}
-              className={cn('flex flex-col items-center gap-1.5 rounded-xl border px-1 py-2.5 text-[11.5px] font-semibold transition-colors disabled:opacity-50',
-                style === s.key ? 'border-azure bg-azure-50 text-azure ring-1 ring-azure' : 'border-line-strong text-ink-2 hover:bg-sunken')}>
-              <span className="size-7">{s.swatch}</span>
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Divider className="my-5" />
-      <ExportBox state={exportState} onExport={onExport} onCancel={onCancel} onDownload={onDownload} onReset={onReset} block={exportBlock} canExport={canExport} destWhere={DEST_PHRASE[dest]} />
     </Card>
   )
 }

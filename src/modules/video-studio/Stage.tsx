@@ -29,7 +29,7 @@ function useContentBox(ref: React.RefObject<HTMLDivElement | null>, w: number, h
 function StageChip({ children, tone = 'glass', className }: { children: React.ReactNode; tone?: 'glass' | 'rec' | 'warm'; className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold backdrop-blur-md',
-      tone === 'glass' && 'bg-white/12 text-white ring-1 ring-white/15',
+      tone === 'glass' && 'bg-[#0b1220]/60 text-white ring-1 ring-white/15',
       tone === 'rec' && 'bg-[#b42318]/90 text-white ring-1 ring-white/20',
       tone === 'warm' && 'bg-[#fdf0d9]/95 text-[#8a5300]', className)}>
       {children}
@@ -67,7 +67,8 @@ export function Stage({ src, player, destName, compare, setCompare, scan, blurre
   return (
     <div className="overflow-hidden rounded-2xl bg-[radial-gradient(120%_90%_at_50%_0%,#1a2540_0%,#0b1220_62%)] shadow-[0_28px_60px_-28px_rgba(11,28,48,0.55)] ring-1 ring-black/5">
       <div ref={boxRef} tabIndex={0} onKeyDown={onKey} aria-label="Video player. Space to play or pause, arrow keys to skip."
-        className="relative h-[min(56vh,560px)] min-h-[300px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/40"
+        className="relative min-h-[280px] w-full outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/40"
+        style={{ aspectRatio: `${state.w} / ${state.h}`, maxHeight: 'min(62vh, 640px)' }}
         onClick={() => { if (compare === null && !exporting && state.ready) player.toggle() }}>
         <video ref={videoRef} src={src} playsInline preload="auto" aria-hidden tabIndex={-1}
           className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-[0.01]" />
