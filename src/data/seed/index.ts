@@ -39,9 +39,11 @@ export interface AppData {
   evidence: Evidence[]
   training: TrainingModule[]
   notifications: Notification[]
+  /** manifest personId → studentId (null = stays unknown). Used by live upload matching. */
+  faceIndex: Record<string, string | null>
 }
 
-export const DATA_VERSION = 3
+export const DATA_VERSION = 4
 export const pkey = (studentId: string, purpose: MediaPurposeKey) => `${studentId}|${purpose}`
 
 /** Hero students in Class 5B. Order = assignment priority onto the most frequent faces in the media manifest. */
@@ -478,5 +480,6 @@ export function createSeed(): AppData {
   return {
     version: DATA_VERSION, school, people, classes, students, guardians, permissions, notices, events, assets, publications,
     requests, vendors, obligations, controls, incidents, retention, tasks, experts, evidence, training, notifications,
+    faceIndex: Object.fromEntries(personToStudent),
   }
 }

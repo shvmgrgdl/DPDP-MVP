@@ -66,10 +66,10 @@ export const ROLES: RoleDef[] = [
   },
   {
     key: 'photographer', label: 'Photographer (guest access)', person: 'U-PHOTO', blurb: 'Upload-only, time-bound, never sees names',
-    home: '/media/upload-portal', nav: [], abilities: ['upload'],
+    home: '/media/upload/portal', nav: [], abilities: ['upload'],
   },
   {
-    key: 'parent', label: 'Parent', person: 'G-HERO-KABIR', blurb: 'Mobile app: choices, private photos, requests',
+    key: 'parent', label: 'Parent', person: '', blurb: 'Mobile app: choices, private photos, requests',
     home: '/parent', nav: [], abilities: [], mobile: true,
   },
   {

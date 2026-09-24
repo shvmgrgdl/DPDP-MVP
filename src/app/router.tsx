@@ -21,6 +21,7 @@ export const router = createBrowserRouter([
       { path: 'home/*', lazy: mod(() => import('@/modules/coverage')) },
       { path: 'readiness/*', lazy: mod(() => import('@/modules/readiness')) },
       { path: 'privacy/*', lazy: mod(() => import('@/modules/privacy-hub')) },
+      { path: 'media/upload/*', lazy: mod(() => import('@/modules/media-upload')) },
       { path: 'media/*', lazy: mod(() => import('@/modules/media-safe')) },
       { path: 'publish/*', lazy: mod(() => import('@/modules/publish-guard')) },
       { path: 'video/*', lazy: mod(() => import('@/modules/video-studio')) },
