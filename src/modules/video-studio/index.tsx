@@ -1,19 +1,14 @@
 import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
+import { Library } from './Library'
+import { Studio } from './Studio'
 
-function Placeholder() {
-  return (
-    <div>
-      <PageHeader eyebrow="Video Studio" title="Video privacy studio" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
-    </div>
-  )
-}
-
+/** Video Studio: /video (library) and /video/:assetId (privacy studio). */
 export default function Module() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route index element={<Library />} />
+      <Route path=":assetId" element={<Studio />} />
+      <Route path="*" element={<Library />} />
     </Routes>
   )
 }

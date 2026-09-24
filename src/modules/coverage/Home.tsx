@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   ArrowDown, ArrowRight, Check, CircleCheck, Compass, FileDown, Flag, Images, Inbox, MessageCircle, ScanFace, ShieldCheck, Siren, Stamp, Users,
@@ -130,8 +130,12 @@ function NeedsYou() {
 function DeskCard() {
   const people = useApp((s) => s.people)
   const experts = useApp((s) => s.experts)
+  const requests = useApp((s) => s.requests)
   const desk = personOf(people, 'U-DESK')
   const active = experts.find((e) => ['requested', 'scheduled', 'in-review'].includes(e.status))
+  const closed = requests.filter((r) => ['resolved', 'closed'].includes(r.status))
+  const days = closed.map((r) => (new Date(r.steps[r.steps.length - 1]?.at ?? r.receivedAt).getTime() - new Date(r.receivedAt).getTime()) / 86400000)
+  const avg = days.length ? Math.max(1, Math.round(days.reduce((a, b) => a + b, 0) / days.length)) : 0
   return (
     <div className="relative h-full overflow-hidden rounded-2xl bg-navy p-6 text-white shadow-[var(--shadow-card)]">
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-[#2f6bff]/25 blur-3xl" />
@@ -153,6 +157,18 @@ function DeskCard() {
           {active && <> This week: <span className="text-white">{active.title.charAt(0).toLowerCase() + active.title.slice(1)}</span>.</>}
         </p>
         <div className="mt-3 text-[12.5px] text-white/55">Usually replies within 2 working hours</div>
+        {closed.length > 0 && (
+          <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
+            <div>
+              <dt className="text-[11.5px] text-white/55">Requests closed</dt>
+              <dd className="mt-1 font-display text-[24px] font-semibold leading-none"><CountUp value={closed.length} /></dd>
+            </div>
+            <div>
+              <dt className="text-[11.5px] text-white/55">Average time to close</dt>
+              <dd className="mt-1 font-display text-[24px] font-semibold leading-none"><CountUp value={avg} /><span className="ml-1 font-sans text-[13px] font-normal text-white/60">days</span></dd>
+            </div>
+          </dl>
+        )}
         <div className="mt-auto pt-5">
           <Button to="/experts" variant="secondary" icon={<MessageCircle className="size-4" />} className="w-full border-transparent bg-white text-navy hover:bg-white/90">
             Message the desk
@@ -376,7 +392,7 @@ function ChairmanHome() {
         <Rise i={8} className="scroll-mt-24 lg:col-span-2"><div id="needs-you" className="h-full"><NeedsYou /></div></Rise>
         <Rise i={9}><DeskCard /></Rise>
       </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <Rise i={10}><MediaSafetyCard /></Rise>
         <Rise i={10.5}><PermissionsCard /></Rise>
         <Rise i={11}><RequestsCard /></Rise>

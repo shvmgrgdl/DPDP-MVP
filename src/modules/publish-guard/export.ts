@@ -14,7 +14,7 @@ import { fmtDate, fmtDateTime, sha256 } from '@/lib/utils'
 import { ROLE } from '@/roles/roles'
 import { personName, useApp } from '@/store/app'
 import { blobBytes, canvasToJpeg, downloadBlob, fetchBytes, fileExt, fileStem, loadImage, renderBlurred } from './blur'
-import { actorId, firstName, purposeLabel } from './shared'
+import { actorId, classShort, firstName, purposeLabel } from './shared'
 
 export const EXPORT_BLUR = { style: 'soft' as const, label: 'Soft blur', strength: 7 }
 
@@ -77,7 +77,7 @@ function faceRecord(ctx: EngineCtx, fe: FaceEval, dest: DestinationKey, decision
     faceId: fe.face.id,
     // first name + class only; safeguarded children are never named in an export
     child: adult ? 'Adult / visitor' : st && !st.protected ? firstName(st.name) : null,
-    class: st?.classId ?? null,
+    class: st ? classShort(st.classId) : null,
     decision,
     reason: st?.protected ? 'Never published (school safeguarding rule)' : fe.reason,
     mainSubject: fe.face.main,

@@ -205,8 +205,12 @@ export const useApp = create<AppState>()(
       },
       migrate: () => ({}) as AppState, // version bump → fresh seed
       onRehydrateStorage: () => (state) => {
+        // continue id sequence above anything already persisted (ids must never repeat after reload)
+        if (state) {
+          const all = [...state.evidence, ...state.tasks, ...state.notifications, ...state.publications, ...state.experts, ...state.requests].map((x) => x.id)
+          for (const id of all) { const n = Number(/(\d+)$/.exec(id)?.[1] ?? 0); if (n >= seq && n < 1e7) seq = n + 1 }
+        }
         useApp.setState({ hydrated: true })
-        void state
       },
     },
   ),

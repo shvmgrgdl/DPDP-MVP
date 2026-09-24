@@ -7,7 +7,7 @@ import { Button, Chip } from '@/design/ui'
 import { evaluateAsset } from '@/engine/permission'
 import { useApp, personName } from '@/store/app'
 import { useCtx } from '@/store/hooks'
-import { cn, DEMO_NOW, fmtDate, fmtNum, pct } from '@/lib/utils'
+import { cn, DEMO_NOW, fmtDate, fmtNum } from '@/lib/utils'
 import { actorFor, openRequests, personOf, statusLabel, statusLine, statusTone, summarizeAreas } from './lib'
 import { Rise } from './parts'
 

@@ -357,16 +357,29 @@ function RecognisedPanel({ findings, notes }: { findings: Finding[]; notes: stri
 
 /* ---------------- Results: items sort into four buckets ---------------- */
 
-function ResultItem({ f }: { f: Finding }) {
+/** Same body in the deck and in the columns, so each card only translates while it flies. */
+function ResultBody({ f }: { f: Finding }) {
   const look = findingLook(f)
   return (
-    <motion.div layoutId={`r-${f.id}`} layout transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-      className={cn('relative z-20 rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[0_1px_2px_rgba(11,28,48,.05)]')}>
-      <motion.div layout="position" className="text-[13.5px] font-semibold leading-snug text-ink">{f.title}</motion.div>
-      {f.tag && <div className={cn('mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', look.cls)}><look.icon className="size-3" />{f.tag === 'exemption' ? 'School exemption' : 'Media Safe'}</div>}
-      {f.bucket !== 'covered' && (
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }} className="mt-1 text-[12.5px] leading-snug text-ink-2">{f.detail}</motion.p>
+    <>
+      <div className="text-[13.5px] font-semibold leading-snug text-ink">{f.title}</div>
+      {f.tag && (
+        <div className={cn('mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', look.cls)}>
+          <look.icon className="size-3" />{f.tag === 'exemption' ? 'School exemption' : 'Media Safe'}
+        </div>
       )}
+      {f.bucket !== 'covered' && <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{f.detail}</p>}
+    </>
+  )
+}
+
+const FLY = { type: 'spring', stiffness: 240, damping: 30, mass: 0.9 } as const
+
+function ResultItem({ f }: { f: Finding }) {
+  return (
+    <motion.div layoutId={`r-${f.id}`} layout transition={FLY}
+      className="relative z-20 rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[0_1px_2px_rgba(11,28,48,.05)]">
+      <ResultBody f={f} />
     </motion.div>
   )
 }
@@ -431,20 +444,24 @@ function Results({ answers, onReview, onRestart }: { answers: Answers; onReview:
       </Rise>
 
       <LayoutGroup>
-        <div className="relative mt-8 h-[124px]">
+        <div className="relative mt-8 h-[136px]">
           <AnimatePresence mode="wait" initial={false}>
             {!done ? (
-              <motion.div key="deck" exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex h-full flex-col items-center">
-                <div className="relative h-[84px]" style={{ width: cardW }}>
-                  {deck.slice(0, 4).map((f, depth) => (
-                    <motion.div key={f.id} layoutId={`r-${f.id}`} layout
-                      className="absolute rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[0_6px_18px_rgba(11,28,48,.08)]"
-                      style={{ top: depth * 9, left: depth * 12, right: depth * 12, zIndex: 10 - depth, opacity: depth > 2 ? 0 : 1 - depth * 0.18 }}>
-                      <motion.div layout="position" className="truncate text-[13.5px] font-semibold text-ink">{f.title}</motion.div>
+              <motion.div key="deck" exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex h-full items-start justify-center gap-6">
+                <div className="w-[150px] pt-3 text-right">
+                  <div className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink-3">Sorting</div>
+                  <div className="mt-1 font-display text-[26px] font-semibold leading-none text-ink num">{placed}<span className="text-[16px] text-ink-3"> / {findings.length}</span></div>
+                </div>
+                <div className="relative h-full" style={{ width: cardW }}>
+                  {deck.slice(0, 3).map((f, depth) => (
+                    <motion.div key={f.id} layoutId={`r-${f.id}`} layout transition={FLY}
+                      className="absolute inset-x-0 rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[0_8px_22px_rgba(11,28,48,.09)]"
+                      style={{ top: depth * 8, zIndex: 10 - depth, opacity: 1 - depth * 0.25 }}>
+                      <ResultBody f={f} />
                     </motion.div>
                   ))}
                 </div>
-                <div className="mt-2 text-[12.5px] font-medium text-ink-3">Sorting {deck.length} of {findings.length}…</div>
+                <div className="w-[150px]" />
               </motion.div>
             ) : (
               <motion.div key="cta" initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: EASE }}

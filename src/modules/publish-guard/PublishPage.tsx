@@ -193,7 +193,7 @@ export default function PublishPage() {
                   <EyeOff className="mt-0.5 size-4 shrink-0" />
                   <div>
                     <span className="font-semibold">Print, newspapers and paid ads never use blurred faces.</span>{' '}
-                    <span className="text-ink-2">{d.note ?? 'Every child shown needs their parent’s permission for this use.'} Photos that would need a blur are held back instead.</span>
+                    <span className="text-ink-2">Every child shown needs their parent’s permission for “{purposeLabel(dest)}”, so photos that would need a blur are held back instead.</span>
                   </div>
                 </div>
               )}
@@ -202,7 +202,7 @@ export default function PublishPage() {
                 {scanning ? (
                   <ScanPanel photos={photos} faceCount={faceCount} dest={dest} />
                 ) : (
-                  <div className="grid gap-4 p-4 md:grid-cols-3 md:p-5">
+                  <div className="grid items-start gap-4 p-4 md:grid-cols-3 md:p-5">
                     <Column index={0} tone="ok" icon={<CircleCheck className="size-4" />} title="Ready to share" count={ready.length}
                       blurb={`Everyone in these photos is cleared for ${d.short === 'Print' ? 'print' : d.label}.`}
                       empty={<ColumnEmpty icon={<Info className="size-4" />} text={`No photo is cleared as taken for ${d.label}.`} />}>
@@ -384,7 +384,7 @@ function Column({ index, tone, icon, title, count, blurb, empty, children }: {
 
 function ColumnEmpty({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong/70 bg-surface/60 px-4 py-8 text-center text-[12.5px] text-ink-3">
+    <div className="flex min-h-[168px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong/70 bg-surface/60 px-4 py-8 text-center text-[12.5px] text-ink-3">
       <span className="flex size-8 items-center justify-center rounded-full bg-surface text-ink-3 shadow-sm">{icon}</span>
       {text}
     </div>
@@ -427,7 +427,7 @@ function ReadyThumb({ e, live }: { e: AssetEval; live: boolean }) {
       </motion.div>
       <div className="mt-1 flex items-center gap-1 truncate px-0.5 text-[11.5px] text-ink-3">
         <Check className="size-3 shrink-0 text-ok" strokeWidth={3} />
-        {n ? `${n} face${n > 1 ? 's' : ''}, all cleared` : 'No faces'}
+        {n === 0 ? 'No faces' : n === 1 ? '1 face cleared' : `All ${n} cleared`}
       </div>
     </div>
   )
@@ -435,8 +435,9 @@ function ReadyThumb({ e, live }: { e: AssetEval; live: boolean }) {
 
 function FixedThumb({ e, dest, canNames, live }: { e: AssetEval; dest: DestinationKey; canNames: boolean; live: boolean }) {
   const blocked = e.faces.filter((f) => f.state === 'blocked')
-  const named = blocked.filter((f) => f.student && !f.student.protected).map((f) => firstName(f.student!.name))
-  const who = canNames && named.length === blocked.length && named.length <= 3 ? named.join(', ') : `${blocked.length} ${blocked.length === 1 ? 'child' : 'children'}`
+  const named = canNames ? blocked.filter((f) => f.student && !f.student.protected).map((f) => firstName(f.student!.name)).slice(0, 2) : []
+  const rest = blocked.length - named.length
+  const who = named.length ? `${named.join(', ')}${rest ? ` +${rest}` : ''}` : `${blocked.length} face${blocked.length === 1 ? '' : 's'}`
   return (
     <div className="min-w-0">
       <motion.div layoutId={`pg-${e.asset.id}`} transition={spring} className="group relative overflow-hidden bg-sunken shadow-sm" style={{ borderRadius: 10 }}>
@@ -470,7 +471,7 @@ function HeldList({ items, dest, canNames }: { items: AssetEval[]; dest: Destina
 function HeldRow({ e, dest, canNames }: { e: AssetEval; dest: DestinationKey; canNames: boolean }) {
   const blocked = e.faces.filter((f) => f.state === 'blocked')
   const detail = e.verdict === 'keep-private'
-    ? [...blocked.filter((f) => f.face.main), ...blocked.filter((f) => !f.face.main)].slice(0, 2).map((f) => ({ id: f.face.id, who: childLabel(f.student, canNames), why: f.reason }))
+    ? [...blocked.filter((f) => f.face.main), ...blocked.filter((f) => !f.face.main)].slice(0, 1).map((f) => ({ id: f.face.id, who: childLabel(f.student, canNames), why: f.reason }))
     : []
   const extra = e.verdict === 'keep-private' ? blocked.length - detail.length : 0
   return (

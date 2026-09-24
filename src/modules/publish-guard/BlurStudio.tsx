@@ -15,7 +15,7 @@ import { useApp } from '@/store/app'
 import { useAsset, useCan, useCtx } from '@/store/hooks'
 import { cn, fmtDate } from '@/lib/utils'
 import { BLUR_STYLES, STRENGTH, baseCanvas, canvasToJpeg, downloadBlob, fileStem, loadImage, regionNorm, renderBlurred, type BlurTarget } from './blur'
-import { DestIcon, REVIEW_LINK, actorId, isDest, photoLink } from './shared'
+import { DestIcon, REVIEW_LINK, actorId, classShort, isDest, photoLink } from './shared'
 
 const PREVIEW_MAX = 1400
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -232,7 +232,7 @@ function Studio({ asset }: { asset: MediaAsset }) {
 
   const back = `/publish?event=${encodeURIComponent(asset.eventId)}&dest=${dest}`
   const nameOf = (f: FaceEval, i: number) =>
-    f.face.review === 'non-student' ? 'Adult / visitor' : !f.student ? 'Not recognised' : canNames ? `${f.student.name} · ${f.student.classId}` : `Child ${i + 1} · ${f.student.classId}`
+    f.face.review === 'non-student' ? 'Adult / visitor' : !f.student ? 'Not recognised' : canNames ? `${f.student.name} · ${classShort(f.student.classId)}` : `Child ${i + 1} · ${classShort(f.student.classId)}`
   const toggleFace = (f: FaceEval, v?: boolean) => setOverrides((o) => ({ ...o, [f.face.id]: v ?? !isBlurred(f) }))
 
   const more = React.useMemo(

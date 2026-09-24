@@ -109,7 +109,7 @@ function BrandPanel() {
     transition: { duration: 0.7, delay: 0.35 + i * 0.12, ease: EASE },
   })
   return (
-    <aside className="relative hidden overflow-hidden bg-navy text-white lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-14">
+    <aside className="relative hidden overflow-hidden bg-navy text-white lg:flex lg:flex-col lg:justify-between lg:gap-8 lg:p-10 xl:p-14">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.07)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(180deg,black,transparent_85%)]" />
       <div aria-hidden className="pointer-events-none absolute -right-40 -top-40 size-[560px] rounded-full bg-[#2f6bff]/20 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -bottom-48 -left-24 size-[460px] rounded-full bg-marigold/10 blur-3xl" />
@@ -123,14 +123,14 @@ function BrandPanel() {
       </div>
 
       <div className="relative max-w-[520px]">
-        <motion.h1 {...float(0)} className="font-display text-[46px] font-semibold leading-[1.06] tracking-[-0.02em]">
+        <motion.h1 {...float(0)} className="font-display text-[40px] font-semibold leading-[1.06] tracking-[-0.02em] xl:text-[46px]">
           Every child’s data, handled with care.
         </motion.h1>
         <motion.p {...float(1)} className="mt-5 max-w-md text-[16.5px] leading-relaxed text-white/75">
           Parents choose purpose by purpose. Every photo is checked before it’s shared. A named privacy desk is on call.
         </motion.p>
 
-        <div className="relative mt-10 h-[196px]">
+        <div className="relative mt-8 h-[186px] xl:mt-10 xl:h-[196px]">
           <motion.div {...float(2)} className="absolute left-0 top-0 w-[330px] rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
             <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-white/55"><ShieldCheck className="size-3.5 text-[#7FB3FF]" />Coverage</div>
             <div className="mt-2 font-display text-[22px] font-semibold leading-tight">Covered in {line.covered} of {line.total} areas</div>
@@ -138,7 +138,7 @@ function BrandPanel() {
               {Array.from({ length: line.total }, (_, i) => <span key={i} className={cn('h-1.5 flex-1 rounded-full', i < line.covered ? 'bg-[#4ade80]' : 'bg-marigold')} />)}
             </div>
           </motion.div>
-          <motion.div {...float(3)} className="absolute left-[230px] top-[92px] w-[300px] rounded-2xl border border-white/10 bg-white/[0.08] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.25)] backdrop-blur">
+          <motion.div {...float(3)} className="absolute left-[110px] top-[92px] w-[300px] xl:left-[230px] rounded-2xl border border-white/10 bg-white/[0.08] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.25)] backdrop-blur">
             <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-white/55"><ScanFace className="size-3.5 text-[#7FB3FF]" />Parent choices</div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-display text-[26px] font-semibold leading-none">{fmtNum(onboarded)}</span>
@@ -147,7 +147,7 @@ function BrandPanel() {
           </motion.div>
         </div>
 
-        <ul className="mt-6 space-y-3 text-[14px] text-white/75">
+        <ul className="mt-5 space-y-3 text-[14px] text-white/75">
           <li className="flex items-center gap-3"><ShieldCheck className="size-4 text-[#7FB3FF]" />Built around India’s DPDP Act and Rules</li>
           <li className="flex items-center gap-3"><FileCheck className="size-4 text-[#7FB3FF]" />Every decision leaves a tamper-evident record</li>
         </ul>

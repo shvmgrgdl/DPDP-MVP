@@ -65,11 +65,18 @@ export function DestIcon({ dest, className, tinted = true }: { dest: Destination
 
 export const firstName = (name: string) => name.split(' ')[0]
 
+/** Readable class name: "5B" for numbered grades, "Nursery C" / "LKG A" for the early years. */
+export function classShort(classId: string) {
+  const c = useApp.getState().classes.find((x) => x.id === classId)
+  if (!c) return classId
+  return /^\d+$/.test(c.grade) ? c.id : `${c.grade} ${c.section}`
+}
+
 /** "Diya · 5B" for staff who may see names, otherwise "A child in 5B". */
 export function childLabel(student: Student | undefined, canNames: boolean, opts: { full?: boolean } = {}) {
   if (!student) return 'Not recognised'
-  if (!canNames) return `A child in ${student.classId}`
-  return `${opts.full ? student.name : firstName(student.name)} · ${student.classId}`
+  if (!canNames) return `A child in ${classShort(student.classId)}`
+  return `${opts.full ? student.name : firstName(student.name)} · ${classShort(student.classId)}`
 }
 
 /** Person id used as the evidence actor for the current role. */

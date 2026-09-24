@@ -284,7 +284,7 @@ export const QUESTIONS: Question[] = [
       { value: 'fedena', label: 'Fedena' },
       { value: 'teachmint', label: 'Teachmint' },
       { value: 'myclassboard', label: 'MyClassboard' },
-      { value: 'other-erp', label: 'Another ERP', hint: 'e.g. CampusCore' },
+      { value: 'other-erp', label: 'Other or in-house ERP' },
       { value: 'google', label: 'Google Workspace' },
       { value: 'm365', label: 'Microsoft 365' },
       { value: 'cctv', label: 'CCTV cameras', yields: ['ex-cctv'] },

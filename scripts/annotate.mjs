@@ -45,7 +45,13 @@ const VIDEO_INDEX_PATH = path.join(ROOT, 'public/media/video/index.json')
 const SEED_INDEX_PATH = path.join(ROOT, 'src/data/seed/index.ts')
 
 const MIN_FACE_WIDTH_FRAC = 0.022 // faces narrower than this (fraction of image width) are dropped
-const ADULT_AGE = 19 // age >= this => adult (tuned by eyeballing debug image + age spread, see report)
+// age >= this => adult. Raised from the naive 19: face-api's age model runs consistently high on
+// this dataset's children in stage makeup/costume (visually-confirmed kids scored 21-24.9 in
+// annual-day dance photos) and even in plain uniforms under motion blur (a confirmed all-children
+// group photo scored up to 33.4). 25 clears every visually-verified child in the sampled photos
+// while still catching a clearly-adult face; there's no clean threshold that catches every motion
+// outlier without also swallowing genuine adults, so this is the practical balance.
+const ADULT_AGE = 25
 const MAIN_AREA_RATIO = 1.6 // largest face must be >= this x the runner-up to be "main"
 const CLUSTER_DIST = 0.5 // euclidean descriptor distance for "same person" (face-api same-person is typically < 0.55)
 const HOLD_BACK_COUNT = 4
