@@ -24,6 +24,7 @@
  *   downscaleToDataUrl(file: Blob | string, max = 1600): Promise<string>   JPEG data URL, long edge ≤ max
  *   downscaleImage(file: Blob | string, max = 1600, quality = 0.86): Promise<{ dataUrl, w, h, canvas }>
  *   loadImage(src): Promise<HTMLImageElement> · fingerprint(blob): Promise<string> (SHA-256 hex)
+ *   getFaceApi(): Promise<typeof import('@vladmandic/face-api')>   raw library (lazy), for advanced use
  *   MATCH_THRESHOLD, MODEL_URL, DESCRIPTORS_URL, FACE_MODEL_INFO
  */
 import { create } from 'zustand'
@@ -106,6 +107,10 @@ interface TfRuntime {
 
 let lib: FaceApi | null = null
 let libPromise: Promise<FaceApi> | null = null
+/** Raw @vladmandic/face-api namespace (lazy), for advanced use. */
+export function getFaceApi(): Promise<FaceApi> {
+  return getLib()
+}
 function getLib(): Promise<FaceApi> {
   if (lib) return Promise.resolve(lib)
   if (!libPromise) {

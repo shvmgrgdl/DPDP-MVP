@@ -43,7 +43,7 @@ export interface AppData {
   faceIndex: Record<string, string | null>
 }
 
-export const DATA_VERSION = 6
+export const DATA_VERSION = 7
 export const pkey = (studentId: string, purpose: MediaPurposeKey) => `${studentId}|${purpose}`
 
 /** Hero students in Class 5B. Order = assignment priority onto the most frequent faces in the media manifest. */
@@ -141,7 +141,6 @@ export function createSeed(): AppData {
       const id = hero ? `STU-5B${String(i + 1).padStart(2, '0')}` : `STU-${String(sid++).padStart(4, '0')}`
       // siblings: ~9% share an existing guardian with same surname
       let g: Guardian | undefined
-      if (!hero && r() < 0.09) g = guardians.slice(-60).find((x) => x.name.endsWith(surname) && x.studentIds.length === 1)
       if (!g) {
         if (hero) g = newGuardian(hero.guardian[0], hero.guardian[1] as Guardian['relation'], 'en')
         else {
@@ -161,6 +160,33 @@ export function createSeed(): AppData {
       if (hero) heroStudentIds.push(st.id)
     }
   }
+  // siblings: merge families (same surname, different classes) until exactly TARGET_FAMILIES remain
+  const TARGET_FAMILIES = 1388
+  {
+    const bySurname = new Map<string, Student[]>()
+    for (const st of students) if (!st.hero) {
+      const sn = st.name.split(' ').slice(1).join(' ')
+      bySurname.set(sn, [...(bySurname.get(sn) ?? []), st])
+    }
+    let merges = guardians.length - TARGET_FAMILIES
+    const removed = new Set<string>()
+    outer: for (const group of bySurname.values()) {
+      for (let i = 0; i + 1 < group.length; i += 2) {
+        if (merges <= 0) break outer
+        const [a, b] = [group[i], group[i + 1]]
+        if (a.classId === b.classId) continue
+        const ga = guardians.find((x) => x.id === a.guardianIds[0])!
+        const gb = guardians.find((x) => x.id === b.guardianIds[0])!
+        if (ga === gb || ga.studentIds.length > 1 || gb.studentIds.length > 1) continue
+        ga.studentIds.push(b.id)
+        b.guardianIds = [ga.id]
+        removed.add(gb.id)
+        merges--
+      }
+    }
+    for (let i = guardians.length - 1; i >= 0; i--) if (removed.has(guardians[i].id)) guardians.splice(i, 1)
+  }
+
   // extra protected (safeguarding) children across school: 5 more (6 total)
   students.filter((s) => !s.hero).filter((_, i) => i % 257 === 13).slice(0, 5).forEach((s) => (s.protected = true))
   const heroByName = (n: string) => students.find((s) => s.name === n && s.hero)!

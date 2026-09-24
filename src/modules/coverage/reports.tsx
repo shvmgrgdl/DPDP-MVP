@@ -83,8 +83,8 @@ function TrusteeReport() {
     for (const n of d.notices) if (n.approvedBy && n.status !== 'draft') out.push({ at: n.publishedAt, text: `Privacy notice ${n.id} approved and published. ${n.summary}`, by: n.approvedBy })
     for (const e of d.evidence) {
       if (e.title.startsWith('Decision recorded:')) {
-        const p = e.payload as { question?: string; decision?: string } | undefined
-        out.push({ at: e.at, text: p?.question ? `${p.question} ${p.decision}.` : e.title.replace('Decision recorded: ', ''), by: e.actor })
+        const p = e.payload as { topic?: string; decision?: string } | undefined
+        out.push({ at: e.at, text: p?.topic ? `${p.topic}: ${p.decision}.` : e.title.replace('Decision recorded: ', ''), by: e.actor })
       } else if (e.type === 'readiness' && e.title.startsWith('Readiness check completed')) {
         out.push({ at: e.at, text: `Readiness plan adopted. ${e.title.replace(/^Readiness check completed:?\s*/, '')}`, by: e.actor })
       }
@@ -264,8 +264,8 @@ function TrusteeReport() {
                 </tr>
               </thead>
               <tbody>
-                {recent.map((e) => (
-                  <tr key={e.id} className="report-row border-t border-line align-top">
+                {recent.map((e, i) => (
+                  <tr key={`${e.id}:${i}`} className="report-row border-t border-line align-top">
                     <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-[10.5px] text-ink-2">{e.id}</td>
                     <td className="whitespace-nowrap py-1.5 pr-3 text-ink-3 num">{fmtDate(e.at)}</td>
                     <td className="py-1.5 pr-3 leading-snug text-ink">{e.title}</td>

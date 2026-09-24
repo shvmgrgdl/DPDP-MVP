@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Link, useNavigate } from 'react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
-  ArrowRight, Check, CircleCheck, Compass, FileDown, Flag, Images, Inbox, MessageCircle, ScanFace, ShieldCheck, Siren, Stamp, Users,
+  ArrowDown, ArrowRight, Check, CircleCheck, Compass, FileDown, Flag, Images, Inbox, MessageCircle, ScanFace, ShieldCheck, Siren, Stamp, Users,
 } from 'lucide-react'
 import { LEGAL } from '@/data/reference'
 import type { Task } from '@/data/types'
@@ -25,7 +25,7 @@ function useAreas() {
 
 /* ---------------- Header (shared by every role) ---------------- */
 
-function HomeHeader({ actions }: { actions?: React.ReactNode }) {
+function HomeHeader({ actions, below }: { actions?: React.ReactNode; below?: React.ReactNode }) {
   const role = useApp((s) => s.role)
   const people = useApp((s) => s.people)
   const school = useApp((s) => s.school)
@@ -46,6 +46,7 @@ function HomeHeader({ actions }: { actions?: React.ReactNode }) {
             <span className="font-medium text-ink">{line.first}</span> {line.second}
           </p>
         </Rise>
+        {below && <Rise i={2.5}>{below}</Rise>}
       </div>
       {actions && <Rise i={3} className="flex flex-wrap items-center gap-2">{actions}</Rise>}
     </header>
@@ -349,16 +350,30 @@ function ReadyTimeline() {
 
 /* ---------------- Chairman home ---------------- */
 
+function WaitingPill() {
+  const tasks = useApp((s) => s.tasks)
+  const n = tasks.filter((t) => t.status === 'open' && t.kind === 'approval').length
+  if (!n) return null
+  return (
+    <button type="button" onClick={() => document.getElementById('needs-you')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+      className="mt-4 inline-flex items-center gap-2 rounded-full border border-marigold/40 bg-[#fdf0d9]/70 py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold text-[#6b4000] transition-colors hover:bg-[#fdf0d9]">
+      <span className="flex size-5 items-center justify-center rounded-full bg-marigold text-[11px] font-bold text-navy num">{n}</span>
+      {n === 1 ? '1 decision is waiting' : `${n} decisions are waiting`}
+      <ArrowDown className="size-3.5" />
+    </button>
+  )
+}
+
 function ChairmanHome() {
   const areas = useAreas()
   return (
     <div className="pb-6">
-      <HomeHeader actions={<Button variant="navy" size="lg" to="/reports/trustee" icon={<FileDown className="size-[18px]" />}>Download trustee report</Button>} />
+      <HomeHeader below={<WaitingPill />} actions={<Button variant="navy" size="lg" to="/reports/trustee" icon={<FileDown className="size-[18px]" />}>Download trustee report</Button>} />
       <section aria-label="Coverage by area" className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {areas.map((a, i) => <Rise key={a.key} i={3 + i * 0.5} className="h-full"><AreaCard area={a} /></Rise>)}
       </section>
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <Rise i={8} className="lg:col-span-2"><NeedsYou /></Rise>
+        <Rise i={8} className="scroll-mt-24 lg:col-span-2"><div id="needs-you" className="h-full"><NeedsYou /></div></Rise>
         <Rise i={9}><DeskCard /></Rise>
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

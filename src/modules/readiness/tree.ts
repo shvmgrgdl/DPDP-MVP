@@ -70,8 +70,9 @@ export const BUCKET_ORDER: Bucket[] = ['covered', 'complete', 'decision', 'speci
 
 /* ------------------------------------------------------------------ */
 
-export const DECISIONS: Record<DecisionKey, { question: string; context: string; options: { label: string; detail: string; recommended?: boolean }[] }> = {
+export const DECISIONS: Record<DecisionKey, { topic: string; question: string; context: string; options: { label: string; detail: string; recommended?: boolean }[] }> = {
   whatsapp: {
+    topic: 'Photos in class WhatsApp groups',
     question: 'How should teachers share photos with class parents?',
     context: 'Class WhatsApp groups are quick, but every photo reaches every family in the group, including children whose parents said no.',
     options: [
@@ -81,6 +82,7 @@ export const DECISIONS: Record<DecisionKey, { question: string; context: string;
     ],
   },
   'paid-ads': {
+    topic: 'Children in paid admission ads',
     question: 'Should children ever appear in paid admission ads?',
     context: 'Paid ads reach strangers and stay online for a long time. Parents choose this separately, and it stays off unless they turn it on.',
     options: [
@@ -89,6 +91,7 @@ export const DECISIONS: Record<DecisionKey, { question: string; context: string;
     ],
   },
   alumni: {
+    topic: 'What the school keeps after a student leaves',
     question: 'What should the school keep after a student leaves?',
     context: 'Transfer certificates and marks are kept as education rules require. Anything else needs a reason and a time limit.',
     options: [
@@ -97,6 +100,7 @@ export const DECISIONS: Record<DecisionKey, { question: string; context: string;
     ],
   },
   'bio-students': {
+    topic: 'Biometric attendance for students',
     question: 'Should students use biometric attendance?',
     context: 'Fingerprints cannot be changed if they leak. A card or app check-in does the same job with less risk.',
     options: [

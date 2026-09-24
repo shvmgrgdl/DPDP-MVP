@@ -53,7 +53,7 @@ function ObligationCard({ ob }: { ob: Obligation }) {
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-1 text-[12px] text-ink-3"><FileCheck className="size-3.5" />Evidence</span>
-          {ids.map((id) => <EvidenceLink key={id} id={id} />)}
+          {ids.map((id, i) => <EvidenceLink key={`${id}:${i}`} id={id} />)}
           {ob.evidenceIds.length > 3 && (
             <button type="button" onClick={() => setShowAll((v) => !v)} className="text-[12px] font-semibold text-ink-2 hover:text-ink">
               {showAll ? 'Show less' : `+${ob.evidenceIds.length - 3} more`}

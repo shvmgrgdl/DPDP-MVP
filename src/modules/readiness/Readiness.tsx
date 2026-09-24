@@ -34,6 +34,16 @@ const BUCKET_BAR: Record<Bucket, string> = { covered: 'bg-ok', complete: 'bg-azu
 
 /* ---------------- Plan creation ---------------- */
 
+/** addTask, but if the returned id already existed (store counter restarts after a reload), give the new task a unique id. */
+function addTaskSafe(t: Parameters<ReturnType<typeof useApp.getState>['addTask']>[0]) {
+  const before = new Set(useApp.getState().tasks.map((x) => x.id))
+  const id = useApp.getState().addTask(t)
+  if (!before.has(id)) return id
+  const unique = `${id}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+  useApp.setState({ tasks: useApp.getState().tasks.map((x, i) => (i === 0 && x.id === id ? { ...x, id: unique } : x)) })
+  return unique
+}
+
 function addToPlan(answers: Answers, findings: Finding[]) {
   const s = useApp.getState()
   const actor = actorFor(s.role)
@@ -45,7 +55,7 @@ function addToPlan(answers: Answers, findings: Finding[]) {
     if (!t) continue
     const exists = openTitles.some((x) => x === t.title.toLowerCase() || (t.skipIfOpen && x.includes(t.skipIfOpen.toLowerCase())))
     if (exists) { already++; continue }
-    created.push(s.addTask({ title: t.title, area: f.area, ownerId: ownerFor(t.owner, answers), dueAt: addDays(DEMO_NOW, t.days), link: t.link, kind: t.kind }))
+    created.push(addTaskSafe({ title: t.title, area: f.area, ownerId: ownerFor(t.owner, answers), dueAt: addDays(DEMO_NOW, t.days), link: t.link, kind: t.kind }))
   }
   const c = countBuckets(findings)
   const ex = findings.filter((f) => f.tag === 'exemption').length

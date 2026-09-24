@@ -185,7 +185,7 @@ export function DecisionDialog() {
     const opt = def.options[choice]
     const evId = s.addEvidence({
       type: 'readiness', title: `Decision recorded: ${opt.label}`, actor: actorFor(s.role), refs: task ? [task.id] : [],
-      payload: { question: def.question, decision: opt.label },
+      payload: { topic: def.topic, question: def.question, decision: opt.label },
     })
     toast.success('Decision recorded', {
       description: 'Saved to the evidence vault and added to the trustee report.',
