@@ -43,7 +43,7 @@ export interface AppData {
   faceIndex: Record<string, string | null>
 }
 
-export const DATA_VERSION = 15
+export const DATA_VERSION = 17
 export const pkey = (studentId: string, purpose: MediaPurposeKey) => `${studentId}|${purpose}`
 
 /** Hero students in Class 5B. Order = assignment priority onto the most frequent faces in the media manifest. */
@@ -303,6 +303,7 @@ export function createSeed(): AppData {
     else if ((freq.get(p) ?? 0) <= 1 && i % 6 === 5) personToStudent.set(p, null) // some one-off faces stay unknown
     else personToStudent.set(p, fromPool(g))
   })
+  let unknownTick = 0
   const studentMap0 = new Map(students.map((x) => [x.id, x]))
   const assets: MediaAsset[] = []
   for (const a of m.assets) {
@@ -314,6 +315,7 @@ export function createSeed(): AppData {
       faces: a.faces.map((f, i) => {
         if (f.adult) return { id: `${a.id}-f${i}`, box: f.box, studentId: null, confidence: 0, review: 'non-student' as const, main: !!f.main }
         let sidm = f.person ? personToStudent.get(f.person) ?? null : null
+        if (!f.person && f.g && unknownTick++ % 4 !== 0) sidm = fromPool(f.g) // most unclustered faces are known classmates; ~1 in 4 stays for review
         // name must match the face's gender (hand-checked labels in the manifest)
         if (sidm && f.g && studentMap0.get(sidm)?.gender !== f.g) sidm = fromPool(f.g)
         // one child can appear only once per photo: a duplicate match becomes a different classmate
@@ -325,7 +327,13 @@ export function createSeed(): AppData {
   }
   for (const v of m.videos) {
     const ev0 = events.find((e) => e.id === v.event) ?? events[0]
-    const tracks = v.tracks.map((t) => ({ trackId: t.trackId, studentId: t.person ? personToStudent.get(t.person) ?? null : null, frames: t.frames }))
+    const usedV = new Set<string>()
+    const tracks = v.tracks.map((t) => {
+      let sid = t.person ? personToStudent.get(t.person) ?? null : unknownTick++ % 4 === 0 ? null : fromPool((t as { g?: 'F' | 'M' }).g ?? 'F')
+      while (sid && usedV.has(sid)) sid = fromPool((t as { g?: 'F' | 'M' }).g ?? 'F')
+      if (sid) usedV.add(sid)
+      return { trackId: t.trackId, studentId: sid, frames: t.frames }
+    })
     assets.push({
       id: v.id, eventId: ev0.id, kind: 'video', src: pub(v.src), w: v.w, h: v.h, duration: v.duration, title: v.title,
       capturedAt: ev0.date, uploadedBy: 'U-PHOTO', tracks,

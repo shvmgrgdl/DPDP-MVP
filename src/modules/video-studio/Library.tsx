@@ -186,7 +186,7 @@ function VideoCard({ entry, ctx, canNames, scan, exported, duration, eventName }
           <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2">
             <ScanFace className="size-4 shrink-0 text-ink-3" />
             <span className="truncate">
-              {lanes ? (faces ? `${faces} ${faces === 1 ? 'face' : 'faces'} tracked${toBlur ? ` · ${toBlur} to blur` : ''}` : 'No faces found') : scanning ? 'Finding faces…' : 'Faces found when opened'}
+              {lanes ? (faces ? `${faces} ${faces === 1 ? 'face' : 'faces'} tracked${toBlur ? ` · ${toBlur} to blur` : ''}` : 'No close-up faces · safe to share') : scanning ? 'Finding faces…' : 'Faces found when opened'}
             </span>
           </span>
           <span className="inline-flex shrink-0 items-center gap-1.5" title="Instagram">

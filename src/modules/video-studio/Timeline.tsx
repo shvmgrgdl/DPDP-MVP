@@ -91,7 +91,7 @@ export function Timeline({ lanes, duration, time, onSeek, selectedId, onSelect, 
 
         {lanes.length === 0 ? (
           <div className="grid border-t border-line" style={{ gridTemplateColumns: `${GUTTER}px minmax(0,1fr)` }}>
-            <div className="px-5 py-5 text-[13px] text-ink-3">{scan?.active ? 'Looking for faces…' : scan?.error ? 'No faces yet' : 'No faces found'}</div>
+            <div className="px-5 py-5 text-[13px] text-ink-3">{scan?.active ? 'Looking for faces…' : scan?.error ? 'No faces yet' : 'No close-up faces in this clip — nothing to blur'}</div>
             <div className="flex items-center border-l border-line px-5 text-[13px] text-ink-3">
               {scan?.active ? 'Faces appear here as they’re found.' : scan?.error ? '' : 'Nobody’s face is visible in this video, so there’s nothing to blur.'}
             </div>
