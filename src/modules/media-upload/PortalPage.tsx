@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useSearchParams } from 'react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { AlertCircle, Ban, Check, EyeOff, Info, KeyRound, Loader2, Lock, Mail, Phone, ScanFace, UploadCloud } from 'lucide-react'
 import { create } from 'zustand'
@@ -16,12 +17,16 @@ import { accessState, countdown, issuePhotographerLink, PHOTO_VENDOR_ID, scopedE
 
 /** Device checklist confirmation survives navigation within the session. */
 const useAttestation = create<{ evidenceId: string | null; token: string | null }>(() => ({ evidenceId: null, token: null }))
+useApp.subscribe((s, prev) => { if (s.evidence.length < prev.evidence.length) useAttestation.setState({ evidenceId: null, token: null }) })
 
 export function PortalPage() {
   const role = useApp((s) => s.role)
   const v = usePhotoVendor()
   const now = useTicker(1000)
-  const state = accessState(v, now)
+  const [params] = useSearchParams()
+  const linkToken = params.get('token')
+  // an old link (after the school issued a new one) is closed too
+  const state = linkToken && v?.access && linkToken !== v.access.token ? 'replaced' : accessState(v, now)
   const eventId = scopedEventId(v) ?? ''
   const event = useApp((s) => s.events.find((e) => e.id === eventId))
   const photographer = useApp((s) => s.people.find((p) => p.id === 'U-PHOTO'))
@@ -218,7 +223,7 @@ function CheckRow({ checked, onChange, disabled, title, body }: { checked: boole
   return (
     <button type="button" role="checkbox" aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)}
       className={cn('flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors disabled:cursor-not-allowed',
-        checked ? 'border-ok/30 bg-ok-bg/60' : 'border-line bg-surface hover:border-line-strong', disabled && 'opacity-55')}>
+        checked ? 'border-ok/30 bg-ok-bg/60' : 'border-line bg-surface hover:border-line-strong', disabled && !checked && 'opacity-55')}>
       <span className={cn('mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors', checked ? 'border-ok bg-ok text-white' : 'border-line-strong bg-surface')}>
         <AnimatePresence>{checked && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}><Check className="size-3.5" strokeWidth={3} /></motion.span>}</AnimatePresence>
       </span>
@@ -276,12 +281,14 @@ function DeviceChecklist({ vendor, eventName, eventId, photos }: { vendor: Vendo
 
 /* ---------------- Closed link ---------------- */
 
-function ClosedLink({ vendor, state, preview }: { vendor?: Vendor; state: ReturnType<typeof accessState>; preview: boolean }) {
+function ClosedLink({ vendor, state, preview }: { vendor?: Vendor; state: ReturnType<typeof accessState> | 'replaced'; preview: boolean }) {
   const school = useApp((s) => s.school)
   const canVendors = useCan('manage-vendors')
   const canApprove = useCan('approve')
   const reason = state === 'revoked'
     ? 'The school has switched this upload link off.'
+    : state === 'replaced'
+      ? 'The school has replaced this link with a newer one.'
     : state === 'expired' && vendor?.access
       ? `This link expired on ${fmtDateTime(vendor.access.expiresAt)}.`
       : 'There is no active upload link for this photographer.'
@@ -292,7 +299,7 @@ function ClosedLink({ vendor, state, preview }: { vendor?: Vendor; state: Return
           <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-sunken text-ink-2"><Lock className="size-7" /></span>
           <h1 className="mt-4 font-display text-[26px] font-semibold text-ink">This upload link is closed</h1>
           <p className="mx-auto mt-2 max-w-sm text-[14.5px] text-ink-2">{reason} Photos already uploaded are safe with the school.</p>
-          {vendor?.access && <div className="mt-3"><Mono className="rounded-md bg-sunken px-2 py-1 text-ink-3 line-through decoration-ink-3/50">{vendor.access.token}</Mono></div>}
+          {vendor?.access && state !== 'replaced' && <div className="mt-3"><Mono className="rounded-md bg-sunken px-2 py-1 text-ink-3 line-through decoration-ink-3/50">{vendor.access.token}</Mono></div>}
           <div className="mt-6 rounded-xl bg-sunken/70 p-4 text-left text-[13.5px] text-ink-2">
             <div className="font-semibold text-ink">Still have photos to share?</div>
             <p className="mt-0.5">Ask {school.privacyContact.name} ({school.privacyContact.role.toLowerCase()}) for a new link.</p>

@@ -64,10 +64,15 @@ export interface SessionState {
   retry: () => void
   /** Stop photos that have not started yet (e.g. the upload link was closed). */
   cancelQueued: (reason: string) => void
+  /** Forget everything (demo reset). Work in flight is dropped, not saved. */
+  reset: () => void
 }
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i
 export const isImageFile = (f: File) => f.type.startsWith('image/') || IMAGE_EXT.test(f.name)
+
+/** The largest face is the photo's main subject only when it is at least this much bigger than the next one. */
+const MAIN_AREA_RATIO = 1.6
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 let seq = 0
@@ -102,6 +107,7 @@ function friendlyError(e: unknown) {
 function makeSession(mode: Mode) {
   const files = new Map<string, File>()
   const previews = new Map<string, string>()
+  let generation = 0
 
   const useSession = create<SessionState>((set, get) => ({
     items: [],
@@ -129,6 +135,11 @@ function makeSession(mode: Mode) {
       set({ items: keep, focusKey: null })
     },
     focus: (key) => set({ focusKey: key }),
+    reset: () => {
+      generation++
+      for (const i of get().items) release(i.key)
+      set({ items: [], focusKey: null })
+    },
     cancelQueued: (reason) => {
       if (!get().items.some((i) => i.phase === 'queued')) return
       set({ items: get().items.map((i) => (i.phase === 'queued' ? { ...i, phase: 'error', error: reason } : i)) })
@@ -153,6 +164,7 @@ function makeSession(mode: Mode) {
 
   async function pump() {
     if (useSession.getState().running) return
+    const gen = generation
     useSession.setState({ running: true })
     batch = { photos: 0, faces: 0, matched: 0, unknown: 0, eventId: '' }
     try {
@@ -165,7 +177,7 @@ function makeSession(mode: Mode) {
     } finally {
       useSession.setState({ running: false })
     }
-    if (batch.photos) onBatchDone()
+    if (batch.photos && gen === generation) onBatchDone()
   }
 
   function onBatchDone() {
@@ -189,6 +201,8 @@ function makeSession(mode: Mode) {
       return true
     }
     const t0 = performance.now()
+    const gen = generation
+    const stale = () => gen !== generation
     const queued = useSession.getState().items.filter((i) => i.phase === 'queued').length
     const k = mode === 'portal' ? 0.45 : queued > 5 ? 0.55 : 1 // calmer pacing for small batches
     const pace = (ms: number) => sleep(ms * k)
@@ -214,8 +228,11 @@ function makeSession(mode: Mode) {
       }
       // faces narrower than ~1.8% of the width are too small to recognise anyone (same idea as the library annotator)
       const detected = await detectFaces(img.canvas, { minConfidence: 0.35, descriptors: true, minSize: 0.018 })
+      // main subject = the largest face, when it clearly dominates (same 1.6× rule as the library annotator)
+      const area = (i: number) => detected[i].box[2] * detected[i].box[3]
+      const mainIdx = detected.length === 1 || (detected.length > 1 && area(0) >= MAIN_AREA_RATIO * area(1)) ? 0 : -1
       const faces: XFace[] = detected.map((d, i) => ({
-        id: `f${i}`, box: d.box, score: d.score, personId: null, studentId: null, distance: null, confidence: 0, main: i === 0, crop: cropFace(img.canvas, d.box),
+        id: `f${i}`, box: d.box, score: d.score, personId: null, studentId: null, distance: null, confidence: 0, main: i === mainIdx, crop: cropFace(img.canvas, d.box),
       }))
       patch(item.key, { faces, detected: true })
       await minStep
@@ -254,13 +271,15 @@ function makeSession(mode: Mode) {
       const ev = evaluateAsset(app(), asset, 'instagram')
       patch(item.key, {
         faces: matched.map((f, i) => ({ ...f, state: ev.faces[i]?.state, reason: ev.faces[i]?.reason })),
-        verdict: ev.verdict, reason: ev.reason, assetId,
+        verdict: ev.verdict, reason: matched.length ? ev.reason : 'No faces in this photo, so there is nothing to hold back.', assetId,
       })
       await pace(700)
 
       // 4 · evidence
+      if (stale()) return false
       patch(item.key, { phase: 'evidence' })
       await pace(350)
+      if (stale()) return false
       const nMatched = matched.filter((f) => f.studentId).length
       const nUnknown = matched.length - nMatched
       useApp.setState((s) => ({ assets: [...s.assets, asset] }))
@@ -298,6 +317,14 @@ function makeSession(mode: Mode) {
 
 export const useStaffSession = makeSession('staff')
 export const usePortalSession = makeSession('portal')
+
+// A demo reset rebuilds the store from the seed (the evidence chain gets shorter): start clean too.
+useApp.subscribe((s, prev) => {
+  if (s.evidence.length < prev.evidence.length) {
+    useStaffSession.getState().reset()
+    usePortalSession.getState().reset()
+  }
+})
 
 /* ---------------- derived helpers ---------------- */
 

@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { phaseIndex, type XFace, type XItem } from './session'
@@ -15,6 +14,9 @@ const ringCls: Record<RingTone, string> = {
 const labelCls: Record<RingTone, string> = {
   found: 'text-ink', named: 'text-azure', unknown: 'text-info', ok: 'text-ok', blocked: 'text-warn',
 }
+
+/** hoverFace value that highlights every unknown face at once */
+export const UNKNOWN_GROUP = '__unknown'
 
 export function ringTone(item: XItem, f: XFace, anonymous: boolean): RingTone {
   if (anonymous) return 'found'
@@ -40,13 +42,13 @@ export interface XRayPhotoProps {
 export function XRayPhoto({ item, anonymous, maxHeight = 460, names, hoverFace, onHoverFace, labels = 'auto', className, rounded = 'rounded-xl' }: XRayPhotoProps) {
   const reduce = useReducedMotion()
   const aspect = item.w && item.h ? item.w / item.h : 4 / 3
-  const p = phaseIndex(item.phase)
   const scanning = item.phase === 'reading' || (item.phase === 'faces' && !item.faces.length)
   const matchedPhase = !!item.matched
+  const hot = (f: XFace) => hoverFace === f.id || (hoverFace === UNKNOWN_GROUP && !f.studentId)
   const showLabel = (f: XFace) => {
     if (anonymous || labels === 'never' || !matchedPhase) return false
-    if (labels === 'always') return true
-    return item.faces.length <= 6 || hoverFace === f.id
+    if (labels === 'always' || hot(f)) return true
+    return item.faces.length <= 6 && f.box[2] >= 0.045 // small faces: names live in the chips (hover to see)
   }
   return (
     <div className={cn('relative mx-auto', className)} style={{ aspectRatio: String(aspect), width: `min(100%, ${Math.round(maxHeight * aspect)}px)` }}>
@@ -57,7 +59,7 @@ export function XRayPhoto({ item, anonymous, maxHeight = 460, names, hoverFace, 
         )}
         {scanning && !reduce && (
           <motion.div aria-hidden className="pointer-events-none absolute inset-x-0 h-1/3"
-            style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(173,205,255,0.22) 55%, rgba(255,255,255,0) 100%)' }}
+            style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(173,205,255,0.3) 55%, rgba(255,255,255,0) 100%)' }}
             initial={{ top: '-35%' }} animate={{ top: ['-35%', '100%'] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }} />
         )}
       </div>
@@ -66,9 +68,10 @@ export function XRayPhoto({ item, anonymous, maxHeight = 460, names, hoverFace, 
           const tone = ringTone(item, f, !!anonymous)
           const pad = 0.16
           const [x, y, w, h] = f.box
-          const style: React.CSSProperties = { left: `${(x - w * pad) * 100}%`, top: `${(y - h * pad) * 100}%`, width: `${w * (1 + pad * 2) * 100}%`, height: `${h * (1 + pad * 2) * 100}%` }
+          // centred on the face, never smaller than 22px so rings on distant faces stay visible
+          const style = { left: `${(x + w / 2) * 100}%`, top: `${(y + h / 2) * 100}%`, width: `max(${w * (1 + pad * 2) * 100}%, 22px)`, height: `max(${h * (1 + pad * 2) * 100}%, 22px)`, x: '-50%', y: '-50%' }
           const name = f.studentId ? names?.get(f.studentId) : undefined
-          const hovered = hoverFace === f.id
+          const hovered = hot(f)
           return (
             <motion.div key={f.id} className="absolute" style={style}
               initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 1.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}

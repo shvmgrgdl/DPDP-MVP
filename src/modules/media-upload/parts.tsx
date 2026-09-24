@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertCircle, Check, Cpu, ImagePlus, Loader2, Lock, RotateCcw, Sparkles, UploadCloud } from 'lucide-react'
+import { AlertCircle, Check, ImagePlus, Loader2, Lock, RotateCcw, Sparkles, UploadCloud } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Tip } from '@/design/ui'
 import { VerdictChip } from '@/design/media'
@@ -65,6 +65,9 @@ export interface DropZoneProps {
   className?: string
 }
 
+/** Photos are kept in the browser, so one drop is capped to keep the demo responsive. */
+const MAX_PER_DROP = 40
+
 export function DropZone({ onFiles, onSamples, samplesLoading, compact, disabled, title, hint, extra, className }: DropZoneProps) {
   const [over, setOver] = React.useState(false)
   const input = React.useRef<HTMLInputElement>(null)
@@ -73,7 +76,8 @@ export function DropZone({ onFiles, onSamples, samplesLoading, compact, disabled
     const all = [...list]
     const imgs = all.filter(isImageFile)
     if (all.length > imgs.length) toast.message(`Skipped ${all.length - imgs.length} file${all.length - imgs.length === 1 ? '' : 's'} that ${all.length - imgs.length === 1 ? 'is' : 'are'} not a photo`)
-    if (imgs.length) onFiles(imgs)
+    if (imgs.length > MAX_PER_DROP) toast.message(`Added the first ${MAX_PER_DROP} photos`, { description: 'Add the rest once these are checked.' })
+    if (imgs.length) onFiles(imgs.slice(0, MAX_PER_DROP))
   }
   const pick = () => input.current?.click()
   const samplesBtn = onSamples && (
@@ -93,7 +97,7 @@ export function DropZone({ onFiles, onSamples, samplesLoading, compact, disabled
       {compact ? (
         <div className="flex flex-wrap items-center gap-3 px-4 py-3">
           <span className={cn('flex size-9 items-center justify-center rounded-xl transition-colors', over ? 'bg-azure text-white' : 'bg-azure-50 text-azure')}><UploadCloud className="size-5" /></span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[240px] flex-1">
             <div className="text-[14px] font-semibold text-ink">{over ? 'Drop to check these photos' : title ?? 'Add more photos'}</div>
             <div className="text-[12.5px] text-ink-3">{hint ?? 'Drag photos here or choose them.'}</div>
           </div>
@@ -168,13 +172,5 @@ export function Filmstrip({ items, activeKey, onSelect, anonymous }: { items: XI
         })}
       </AnimatePresence>
     </div>
-  )
-}
-
-/** Small "how it runs" note with the engine backend. */
-export function EngineFootnote() {
-  const backend = useFaceEngine((s) => s.backend)
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-3"><Cpu className="size-3.5" /> Runs on this computer’s {backendLabel(backend)}</span>
   )
 }

@@ -18,7 +18,7 @@ import { cn, fmtDate, fmtDateTime } from '@/lib/utils'
 import { loadDescriptors, useFaceEngine } from '@/media/face'
 import { phaseIndex, stageItem, summarizeItems, useStaffSession, type XFace, type XItem } from './session'
 import { DropZone, EngineStatus, Filmstrip } from './parts'
-import { FaceCrop, XRayPhoto, ringTone } from './XRayPhoto'
+import { FaceCrop, UNKNOWN_GROUP, XRayPhoto, ringTone } from './XRayPhoto'
 import { fetchSampleFiles, useSamples } from './samples'
 import { accessState, countdown, issuePhotographerLink, revokePhotographerLink, usePhotoVendor, useTicker } from './access'
 
@@ -77,7 +77,7 @@ export function UploadPage() {
         eyebrow={<span className="inline-flex items-center gap-1.5"><ScanFace className="size-3.5" /> Media Safe · Media X-Ray</span>}
         title="Check photos as they arrive"
         subtitle="Every photo is looked at the moment it lands: faces found, matched to the class roster, each parent’s choices applied, and a record kept — before anyone can share it."
-        actions={<EngineStatus />}
+        actions={canUpload ? <EngineStatus /> : undefined}
       />
 
       <EventPicker events={events} value={eventId} onChange={(id) => { setEvent(id); useStaffSession.getState().focus(null) }} />
@@ -172,8 +172,8 @@ function Stage({ item, items, live }: { item: XItem; items: XItem[]; live: boole
   const permissionsDone = !!item.verdict
   return (
     <Card className="overflow-hidden">
-      <div className="grid lg:grid-cols-[minmax(0,1.4fr)_minmax(340px,1fr)]">
-        <div className="relative flex flex-col justify-center bg-navy px-5 pb-4 pt-5 lg:min-h-[500px]">
+      <div className="grid xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,1fr)]">
+        <div className="relative flex flex-col justify-center bg-navy px-5 pb-4 pt-5 xl:min-h-[500px]">
           <XRayPhoto item={item} names={names} hoverFace={hoverFace} onHoverFace={setHoverFace} maxHeight={440} />
           <div className="mt-4 flex min-h-5 flex-wrap items-center justify-between gap-3 text-[11.5px] text-white/70">
             <span className="truncate">{item.name}</span>
@@ -306,14 +306,18 @@ function MatchBody({ item, status, names, hoverFace, onHoverFace }: { item: XIte
   if (!item.matched) return <p className={muted}>Comparing with the class roster…</p>
   if (!item.faces.length) return <p className={muted}>Nothing to match.</p>
   const faces = [...item.faces].sort((a, b) => Number(!!b.studentId) - Number(!!a.studentId) || (names.get(a.studentId ?? '') ?? '').localeCompare(names.get(b.studentId ?? '') ?? ''))
-  const nMatched = faces.filter((f) => f.studentId).length
-  const shown = faces.slice(0, 10)
+  const known = faces.filter((f) => f.studentId)
+  const unknown = faces.filter((f) => !f.studentId)
+  const groupUnknown = unknown.length > 3
+  const shown = (groupUnknown ? known : faces).slice(0, 10)
+  const hidden = (groupUnknown ? known.length : faces.length) - shown.length
   return (
     <div>
-      <p className="mt-0.5 text-[13px] text-ink-2"><span className="font-semibold text-ink num">{nMatched}</span> matched · <span className="font-semibold text-ink num">{faces.length - nMatched}</span> unknown</p>
+      <p className="mt-0.5 text-[13px] text-ink-2"><span className="font-semibold text-ink num">{known.length}</span> matched · <span className="font-semibold text-ink num">{unknown.length}</span> unknown</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {shown.map((f, i) => <NameChip key={f.id} f={f} i={i} item={item} name={f.studentId ? names.get(f.studentId) : undefined} hovered={hoverFace === f.id} onHover={onHoverFace} />)}
-        {faces.length > shown.length && <span className="flex h-7 items-center rounded-full bg-sunken px-2.5 text-[11.5px] font-semibold text-ink-2">+{faces.length - shown.length} more</span>}
+        {hidden > 0 && <span className="flex h-7 items-center rounded-full bg-sunken px-2.5 text-[11.5px] font-semibold text-ink-2">+{hidden} more</span>}
+        {groupUnknown && <UnknownGroupChip faces={unknown} item={item} i={shown.length} hovered={hoverFace === UNKNOWN_GROUP} onHover={onHoverFace} />}
       </div>
       <p className="mt-2 text-[12px] text-ink-3">
         {noRoster ? 'Roster face signatures are not set up yet, so faces stay Unknown until a person checks them.' : 'Unknown faces are never guessed. A person checks them.'}
@@ -333,6 +337,20 @@ function NameChip({ f, i, item, name, hovered, onHover }: { f: XFace; i: number;
       <FaceCrop src={f.crop} size={22} tone={tone} className="ring-[1.5px]" />
       {name ?? 'Unknown'}
       {name && <span className="font-medium text-ink-3 num">{Math.round(f.confidence * 100)}%</span>}
+    </motion.button>
+  )
+}
+
+function UnknownGroupChip({ faces, item, i, hovered, onHover }: { faces: XFace[]; item: XItem; i: number; hovered: boolean; onHover: (id: string | null) => void }) {
+  return (
+    <motion.button type="button" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 10) * 0.06 }}
+      onMouseEnter={() => onHover(UNKNOWN_GROUP)} onMouseLeave={() => onHover(null)} onFocus={() => onHover(UNKNOWN_GROUP)} onBlur={() => onHover(null)}
+      title="Not matched to any student. A person checks these."
+      className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border py-0.5 pl-0.5 pr-2.5 text-[12px] font-semibold text-info transition-colors', hovered ? 'border-azure bg-azure-50' : 'border-line bg-surface')}>
+      <span className="flex -space-x-1.5">
+        {faces.slice(0, 4).map((f) => <FaceCrop key={f.id} src={f.crop} size={22} tone={ringTone(item, f, false)} className="ring-[1.5px] ring-offset-0" />)}
+      </span>
+      <span className="num">{faces.length}</span> Unknown
     </motion.button>
   )
 }
@@ -409,7 +427,7 @@ function SummaryCard({ items, eventId, eventName }: { items: XItem[]; eventId: s
             <div className="mt-2 flex flex-wrap items-baseline font-display text-[26px] font-semibold leading-tight text-ink num md:text-[30px]">
               <span>{s.done} photo{s.done === 1 ? '' : 's'}</span><Dot />
               <span>{s.faces} face{s.faces === 1 ? '' : 's'}</span><Dot />
-              <span className="text-ok">{s.matched} matched</span><Dot />
+              <span className={s.matched ? 'text-ok' : 'text-ink-3'}>{s.matched} matched</span><Dot />
               <span className={s.unknown ? 'text-info' : 'text-ink-3'}>{s.unknown} need{s.unknown === 1 ? 's' : ''} a check</span>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">

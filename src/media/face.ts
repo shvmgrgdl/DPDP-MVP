@@ -13,7 +13,7 @@
  *   detectFaces(input: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, opts?) → Promise<DetectedFace[]>
  *       opts: { minConfidence = 0.35, descriptors = true, maxResults = 100, tiles = 'auto', minSize = 0, detector = 'ssd', inputSize = 416 }
  *       DetectedFace = { box: [x, y, w, h] normalised 0..1, score, descriptor?: Float32Array }, sorted largest first.
- *       tiles 'auto' adds overlapping close-up passes on large photos so small faces in group shots are found.
+ *       tiles 'auto' adds overlapping close-up passes on large still photos (not video) so small faces in group shots are found.
  *       detector 'tiny' (lazy-loaded, no descriptors, no tiles) is for fast video loops.
  *   loadDescriptors(force?): Promise<DescriptorIndex>   /media/descriptors.json fetched once ({ [personId]: number[] });
  *       a missing file (404 or the dev server's HTML fallback) resolves to an empty index.
@@ -47,7 +47,7 @@ export interface DetectOptions {
   minConfidence?: number
   descriptors?: boolean
   maxResults?: number
-  /** Extra close-up passes for small faces: 'auto' = on for large inputs when a GPU/WASM backend is active. */
+  /** Extra close-up passes for small faces: 'auto' = on for large still images (not video) on a GPU/WASM backend. */
   tiles?: boolean | 'auto'
   /** 'ssd' (default, accurate) or 'tiny' (fast, for video; no descriptors). */
   detector?: 'ssd' | 'tiny'
@@ -131,14 +131,18 @@ const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.2
 /** 'hw' = GPU-accelerated WebGL, 'sw' = software WebGL only (e.g. no GPU), 'none' = no WebGL. */
 function webglSupport(): 'hw' | 'sw' | 'none' {
   const probe = (attrs?: WebGLContextAttributes) => {
-    try {
-      const a = document.createElement('canvas')
-      if (a.getContext('webgl2', attrs)) return true
-      const b = document.createElement('canvas')
-      return !!b.getContext('webgl', attrs)
-    } catch {
-      return false
+    for (const kind of ['webgl2', 'webgl'] as const) {
+      try {
+        const gl = document.createElement('canvas').getContext(kind, attrs) as WebGLRenderingContext | null
+        if (gl) {
+          gl.getExtension('WEBGL_lose_context')?.loseContext() // browsers cap live contexts; free the probe
+          return true
+        }
+      } catch {
+        /* try the next kind */
+      }
     }
+    return false
   }
   if (probe({ failIfMajorPerformanceCaveat: true })) return 'hw'
   return probe() ? 'sw' : 'none'
@@ -397,10 +401,10 @@ export async function detectFaces(input: MediaInput, opts: DetectOptions = {}): 
   if (detector === 'tiny') {
     await loadTiny(fa)
     const dets = await serial(async () => await fa.detectAllFaces(input, new fa.TinyFaceDetectorOptions({ inputSize, scoreThreshold: minConfidence })))
-    return sortBySize(dets.map((d) => ({ box: normBox(d.box, w, h), score: d.score })))
+    return sortBySize(dets.filter((d) => d.box.width >= minSize * w).map((d) => ({ box: normBox(d.box, w, h), score: d.score })))
   }
   const info = await loadModels()
-  const useTiles = tiles === 'auto' ? Math.max(w, h) >= TILE_MIN_SIDE && info.backend !== 'cpu' : tiles
+  const useTiles = tiles === 'auto' ? !(input instanceof HTMLVideoElement) && Math.max(w, h) >= TILE_MIN_SIDE && info.backend !== 'cpu' : tiles
   return serial(async () => {
     const boxes = (await locate(fa, input, w, h, minConfidence, maxResults, useTiles)).filter((b) => b.w >= minSize * w)
     if (!boxes.length) return []
