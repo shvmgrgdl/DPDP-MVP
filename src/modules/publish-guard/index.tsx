@@ -1,19 +1,16 @@
-import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
+import { Navigate, Route, Routes } from 'react-router'
+import PublishPage from './PublishPage'
+import BlurStudio from './BlurStudio'
+import LivePosts from './LivePosts'
 
-function Placeholder() {
-  return (
-    <div>
-      <PageHeader eyebrow="Publish Guard" title="Where will these photos go?" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
-    </div>
-  )
-}
-
-export default function Module() {
+/** Publish Guard: /publish (destination check + safe-set export), /publish/blur/:assetId (Blur Studio), /publish/live. */
+export default function PublishGuard() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route index element={<PublishPage />} />
+      <Route path="blur/:assetId" element={<BlurStudio />} />
+      <Route path="live" element={<LivePosts />} />
+      <Route path="*" element={<Navigate to="/publish" replace />} />
     </Routes>
   )
 }

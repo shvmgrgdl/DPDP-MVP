@@ -1,11 +1,21 @@
-import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
+import { Routes, Route, Navigate, Outlet } from 'react-router'
+import { TopBar } from './TopBar'
+import { TabBar } from './TabBar'
+import Home from './pages/Home'
+import Setup from './pages/Setup'
+import Choices from './pages/Choices'
+import Photos from './pages/Photos'
+import RequestsPage from './pages/Requests'
+import History from './pages/History'
 
-function Placeholder() {
+function TabLayout() {
   return (
-    <div>
-      <PageHeader eyebrow="Parent" title="Parent app" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
+    <div className="flex h-full flex-col">
+      <TopBar />
+      <main className="flex-1 overflow-y-auto px-4 pb-6 pt-4">
+        <Outlet />
+      </main>
+      <TabBar />
     </div>
   )
 }
@@ -13,7 +23,15 @@ function Placeholder() {
 export default function Module() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route path="setup" element={<Setup />} />
+      <Route element={<TabLayout />}>
+        <Route index element={<Home />} />
+        <Route path="choices" element={<Choices />} />
+        <Route path="photos" element={<Photos />} />
+        <Route path="requests" element={<RequestsPage />} />
+        <Route path="history" element={<History />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/parent" replace />} />
     </Routes>
   )
 }

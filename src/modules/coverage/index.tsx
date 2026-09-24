@@ -1,19 +1,15 @@
-import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
+import { Navigate, Route, Routes } from 'react-router'
+import { Home } from './Home'
+import { AreaDetail } from './AreaDetail'
 
-function Placeholder() {
-  return (
-    <div>
-      <PageHeader eyebrow="Home" title="Coverage Centre" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
-    </div>
-  )
-}
-
-export default function Module() {
+/** Coverage Centre — mounted at /home/*. */
+export default function CoverageModule() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route index element={<Home />} />
+      <Route path="areas/:area" element={<AreaDetail />} />
+      <Route path="areas" element={<Navigate to="/home" replace />} />
+      <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   )
 }

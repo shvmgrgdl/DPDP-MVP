@@ -1,19 +1,10 @@
 import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
-
-function Placeholder() {
-  return (
-    <div>
-      <PageHeader eyebrow="Evidence" title="Evidence vault" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
-    </div>
-  )
-}
+import { EvidenceVault } from './EvidenceVault'
 
 export default function Module() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route index element={<EvidenceVault />} />
     </Routes>
   )
 }

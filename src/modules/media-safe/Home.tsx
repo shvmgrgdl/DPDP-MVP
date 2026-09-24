@@ -36,6 +36,12 @@ export function Home() {
       unchecked: monthPubs.filter((p) => !p.evidenceId).length, // every post carries a Publish Guard record
       unknown: assets.filter((a) => a.kind === 'photo').reduce((n, a) => n + a.faces.filter(isUnknownFace).length, 0),
       live: pubs.filter((p) => p.status === 'live').length,
+      // live originals that now show a child whose parent hasn't allowed this use
+      stale: pubs.filter((p) => {
+        if (p.status !== 'live' || p.variant !== 'original') return false
+        const a = assets.find((x) => x.id === p.assetId)
+        return !!a && evaluateAsset(ctx, a, p.destination).faces.some((f) => f.state === 'blocked')
+      }).length,
       takedown: pubs.filter((p) => p.status === 'takedown-requested').length,
     }
   }, [assets, ctx, allPubs])
@@ -54,18 +60,19 @@ export function Home() {
       <div className="mb-2 flex items-baseline justify-between"><div className="label-caps">This month · {MONTH_LABEL}</div></div>
       <div className="grid gap-4 md:grid-cols-3">
         <Kpi label="Photos checked" icon={<Images className="size-4 text-ink-3" />} value={fmtNum(stats.checked)} sub="Against every parent’s choices, automatically" />
-        <Kpi label="Faces auto-blurred" icon={<EyeOff className="size-4 text-ink-3" />} value={fmtNum(stats.blurred)} sub="Children whose parents said no, hidden before sharing" />
+        <Kpi label="Faces auto-blurred" icon={<EyeOff className="size-4 text-ink-3" />} value={fmtNum(stats.blurred)} sub="Hidden before sharing, as parents asked" />
         <Kpi label="Published without permission" tone="ok" icon={<ShieldCheck className="size-4 text-ok" />} value={stats.unchecked}
           sub={stats.monthPubs ? `${stats.monthPubs} post${stats.monthPubs > 1 ? 's' : ''} this month — every one checked first` : 'Nothing leaves without a check'} />
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <CanWePost scope={scope} className="lg:col-span-2" />
-        <div className="flex flex-col gap-3">
+      <div className="mt-6 grid gap-4 xl:grid-cols-3">
+        <CanWePost scope={scope} className="xl:col-span-2" />
+        <div className="grid gap-3 sm:grid-cols-3 xl:flex xl:flex-col">
           {!scope && <Tile to="/media/review" icon={<UserRoundSearch className="size-5" />} title="Unknown faces to check" value={stats.unknown}
             sub={stats.unknown ? 'We never guess — a quick look fixes it' : 'All faces are identified'} tone={stats.unknown ? 'info' : 'ok'} />}
           {!scope && <Tile to="/publish/live" icon={<Radio className="size-5" />} title="Live posts" value={stats.live}
-            sub={stats.takedown ? `${stats.takedown} flagged for takedown` : 'All match parents’ current choices'} tone={stats.takedown ? 'warn' : 'azure'} />}
+            sub={stats.takedown ? `${stats.takedown} flagged for takedown` : stats.stale ? `${stats.stale} no longer match${stats.stale === 1 ? 'es' : ''} parents’ choices` : 'All match parents’ current choices'}
+            tone={stats.takedown || stats.stale ? 'warn' : 'azure'} />}
           <Tile to="/media/upload" icon={<Upload className="size-5" />} title="Upload" value="Add photos" sub="Faces are checked as they arrive" tone="azure" />
           {scope && <ClassMix scope={scope} />}
         </div>
@@ -73,7 +80,7 @@ export function Home() {
 
       <SectionTitle className="mt-10">Events</SectionTitle>
       {sortedEvents.length ? (
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 xl:grid-cols-2">
           {sortedEvents.map((ev) => <EventCard key={ev.id} ev={ev} assets={assets} ctx={ctx} />)}
         </div>
       ) : (
@@ -87,14 +94,14 @@ const TILE_TONE: Partial<Record<Tone, string>> = { info: 'bg-info-bg text-info',
 
 function Tile({ to, icon, title, value, sub, tone }: { to: string; icon: React.ReactNode; title: string; value: React.ReactNode; sub: string; tone: Tone }) {
   return (
-    <Link to={to} className="group card flex items-center gap-4 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)]">
+    <Link to={to} className="group card flex items-start gap-4 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)] xl:items-center">
       <div className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl', TILE_TONE[tone])}>{icon}</div>
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium text-ink-2">{title}</div>
         <div className="font-display text-[22px] font-semibold leading-tight text-ink num">{value}</div>
-        <div className="truncate text-xs text-ink-3">{sub}</div>
+        <div className="text-xs text-ink-3 xl:truncate">{sub}</div>
       </div>
-      <ChevronRight className="size-4 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-azure" />
+      <ChevronRight className="hidden size-4 shrink-0 xl:block text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-azure" />
     </Link>
   )
 }
@@ -128,6 +135,8 @@ function instagramAnswer(st: Student, status?: string): { tone: Tone; text: stri
   return { tone: 'muted', text: `Not yet. ${f}’s parent hasn’t set photo choices. Until they do, ${pr} is blurred automatically.` }
 }
 
+const QUICK_LEGEND = [['bg-ok', 'Allowed'], ['bg-marigold', 'Parent said no'], ['bg-ink-3/40', 'Not set yet'], ['bg-risk', 'Protected']] as const
+
 function CanWePost({ scope, className }: { scope?: string; className?: string }) {
   const students = useApp((s) => s.students)
   const guardians = useApp((s) => s.guardians)
@@ -138,10 +147,13 @@ function CanWePost({ scope, className }: { scope?: string; className?: string })
   const [picked, setPicked] = React.useState<string | null>(null)
   const matches = React.useMemo(() => searchStudents(students, q, scope, 5), [students, q, scope])
   const sel = (picked ? matches.find((s) => s.id === picked) : undefined) ?? matches[0]
-  const tryNames = React.useMemo(() => {
-    const heroes = students.filter((s) => s.hero && (!scope || s.classId === scope))
-    return ['Diya Patel', 'Kabir Singh', 'Zoya Qureshi', 'Arjun Mehta'].map((n) => heroes.find((h) => h.name === n)).filter((s): s is Student => !!s)
-  }, [students, scope])
+  const cls = scope ?? '5B'
+  const quick = React.useMemo(() => students.filter((s) => s.classId === cls).sort((a, b) => Number(!!b.hero) - Number(!!a.hero)).slice(0, 10), [students, cls])
+  const dotOf = (s: Student) => {
+    if (s.protected) return 'bg-risk'
+    const st = permissions[pkey(s.id, 'public-digital')]?.status
+    return st === 'granted' ? 'bg-ok' : st === 'denied' || st === 'withdrawn' ? 'bg-marigold' : 'bg-ink-3/40'
+  }
   const g = sel ? guardians.find((x) => x.id === sel.guardianIds[0]) : undefined
   const ans = sel ? instagramAnswer(sel, permissions[pkey(sel.id, 'public-digital')]?.status) : undefined
   const photoCount = sel ? assets.filter((a) => a.kind === 'photo' && a.faces.some((f) => f.studentId === sel.id)).length : 0
@@ -163,11 +175,21 @@ function CanWePost({ scope, className }: { scope?: string; className?: string })
       </div>
 
       {!q.trim() && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
-          Try
-          {tryNames.map((s) => (
-            <button key={s.id} type="button" onClick={() => { setQ(s.name); setPicked(s.id) }} className="rounded-full border border-line bg-surface px-3 py-1 font-medium text-ink-2 transition-colors hover:border-azure/40 hover:text-azure">{s.name}</button>
-          ))}
+        <div className="mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="label-caps">Quick look · Class {cls}</div>
+            <div className="flex flex-wrap gap-3 text-[11.5px] text-ink-3">
+              {QUICK_LEGEND.map(([c, l]) => <span key={l} className="inline-flex items-center gap-1.5"><span className={cn('size-2 rounded-full', c)} />{l}</span>)}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {quick.map((s) => (
+              <button key={s.id} type="button" onClick={() => { setQ(s.name); setPicked(s.id) }}
+                className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-3 text-[13px] font-medium text-ink-2 transition-colors hover:border-azure/40 hover:text-ink">
+                <Avatar name={s.name} size={24} />{s.name}<span className={cn('size-2 rounded-full', dotOf(s))} />
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -215,21 +237,21 @@ function EventCard({ ev, assets, ctx }: { ev: SchoolEvent; assets: MediaAsset[];
     return { photos, videos, s: summarize(ctx, photos, 'instagram'), cover }
   }, [assets, ev, ctx])
   return (
-    <Link to={`/media/events/${ev.id}`} className="group card overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)]">
-      <div className="relative aspect-[16/10] overflow-hidden bg-sunken">
+    <Link to={`/media/events/${ev.id}`} className="group card flex flex-col overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)] sm:flex-row">
+      <div className="relative aspect-[16/10] shrink-0 overflow-hidden bg-sunken sm:aspect-auto sm:min-h-[216px] sm:w-[44%]">
         {cover ? (
-          <img src={cover} alt="" loading="lazy" className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+          <img src={cover} alt="" loading="lazy" className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
         ) : (
-          <div className="flex size-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#f1efe9] to-[#e8eefc] text-ink-3">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#f1efe9] to-[#e8eefc] text-ink-3">
             <Camera className="size-7" /><span className="text-xs font-medium">Photos arrive here after upload</span>
           </div>
         )}
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-ink shadow-sm backdrop-blur">{EVENT_STATUS[ev.status]}</span>
       </div>
-      <div className="p-4">
+      <div className="flex min-w-0 flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-[15px] font-semibold text-ink">{ev.name}</h3>
+            <h3 className="truncate text-[16px] font-semibold text-ink">{ev.name}</h3>
             <p className="truncate text-[13px] text-ink-3">{fmtDate(ev.date)} · {ev.location}</p>
           </div>
           <ArrowUpRight className="size-4 shrink-0 text-ink-3 transition-colors group-hover:text-azure" />
@@ -239,13 +261,13 @@ function EventCard({ ev, assets, ctx }: { ev: SchoolEvent; assets: MediaAsset[];
           <span className="inline-flex items-center gap-1.5"><Film className="size-4 text-ink-3" /><span className="num font-semibold text-ink">{videos.length}</span> video{videos.length === 1 ? '' : 's'}</span>
         </div>
         {photos.length ? (
-          <div className="mt-4 border-t border-line pt-3.5">
+          <div className="mt-auto pt-4">
             <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3"><InstagramIcon className="size-3.5" /> For Instagram</div>
             <SummaryBar s={s} />
             <SummaryLegend s={s} className="mt-3" />
           </div>
         ) : (
-          <p className="mt-4 flex items-center gap-2 border-t border-line pt-3.5 text-[13px] text-ink-3"><CircleCheck className="size-4" /> No photos yet — each upload is checked as it lands.</p>
+          <p className="mt-auto flex items-center gap-2 pt-4 text-[13px] text-ink-3"><CircleCheck className="size-4" /> No photos yet — each upload is checked as it lands.</p>
         )}
       </div>
     </Link>

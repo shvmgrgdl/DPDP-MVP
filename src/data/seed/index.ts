@@ -43,7 +43,7 @@ export interface AppData {
   faceIndex: Record<string, string | null>
 }
 
-export const DATA_VERSION = 4
+export const DATA_VERSION = 6
 export const pkey = (studentId: string, purpose: MediaPurposeKey) => `${studentId}|${purpose}`
 
 /** Hero students in Class 5B. Order = assignment priority onto the most frequent faces in the media manifest. */
@@ -292,12 +292,21 @@ export function createSeed(): AppData {
   // ---------- publications: earlier posts, incl. 2 live posts featuring Diya ----------
   const publications: Publication[] = []
   const diya = heroByName('Diya Patel').id
-  const pubAssets = assets.filter((a) => a.kind === 'photo' && a.eventId !== 'annual-day')
-  const diyaAssets = assets.filter((a) => a.kind === 'photo' && a.faces.some((f) => f.studentId === diya))
-  const publishables = [...diyaAssets.slice(0, 2), ...pubAssets.filter((a) => !diyaAssets.includes(a)).slice(0, 6)]
+  const studentMap = new Map(students.map((s) => [s.id, s]))
+  /** Seed-time check (no engine import): every face is a known, unprotected student allowed for public digital use, or an adult. */
+  const publicReady = (a: MediaAsset) => a.faces.length > 0 && a.faces.every((f) => {
+    if (f.review === 'non-student') return true
+    if (!f.studentId) return false
+    const st = studentMap.get(f.studentId)
+    return !!st && !st.protected && permissions[pkey(f.studentId, 'public-digital')]?.status === 'granted'
+  })
+  const earlier = assets.filter((a) => a.kind === 'photo' && a.eventId !== 'annual-day' && publicReady(a))
+  const diyaEarlier = earlier.filter((a) => a.faces.some((f) => f.studentId === diya))
+  const publishables = [...diyaEarlier.slice(0, 2), ...earlier.filter((a) => !diyaEarlier.slice(0, 2).includes(a)).slice(0, 6)]
   publishables.forEach((a, i) => {
-    const dest = (['instagram', 'website', 'instagram', 'facebook', 'website', 'instagram', 'internal', 'website'] as const)[i % 8]
-    const at = addDays(T('2026-08-25T11:00:00+05:30'), i * 3)
+    const dest = (['instagram', 'website', 'instagram', 'facebook', 'website', 'instagram', 'website', 'instagram'] as const)[i % 8]
+    const evDate = events.find((e) => e.id === a.eventId)!.date
+    const at = addDays(evDate, 2 + i)
     const e = ev({ at, type: 'publication', title: `Published ${a.id} to ${dest} via Publish Guard`, actor: 'U-MKT', refs: [a.id, dest] })
     publications.push({ id: `PUB-${300 + i}`, assetId: a.id, destination: dest, variant: 'original', at, by: 'U-MKT', evidenceId: e, status: 'live', url: `https://instagram.com/p/amaltas${300 + i}` })
   })

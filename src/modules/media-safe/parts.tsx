@@ -3,14 +3,14 @@ import { Link } from 'react-router'
 import * as Pop from '@radix-ui/react-popover'
 import { Check, ChevronRight, Globe, Lock, Minus, Printer, Search, Undo2, Users, X } from 'lucide-react'
 import type { FaceInstance, MediaAsset, PermissionStatus, Student, Verdict } from '@/data/types'
-import type { Summary } from '@/engine/permission'
+import type { FaceEval, Summary } from '@/engine/permission'
 import { MEDIA_PURPOSES, VERDICT_META } from '@/data/reference'
 import { Avatar, Chip } from '@/design/ui'
 import { coverBox } from '@/design/media'
 import { InstagramIcon } from '@/design/brand-icons'
 import { useApp, pkey } from '@/store/app'
 import { cn } from '@/lib/utils'
-import { DEST_KEYS, DEST_LABEL, PURPOSE_SHORT, STATUS_TONE, STATUS_WORD, searchStudents, useClassLabel, type MediaDest } from './lib'
+import { DEST_KEYS, DEST_LABEL, PURPOSE_SHORT, STATUS_TONE, STATUS_WORD, firstName, searchStudents, useClassLabel, type MediaDest } from './lib'
 
 export const DEST_ICON: Record<MediaDest, React.ReactNode> = {
   instagram: <InstagramIcon className="size-4" />, website: <Globe className="size-4" />, print: <Printer className="size-4" />, 'private-gallery': <Users className="size-4" />,
@@ -49,6 +49,29 @@ export function FaceCrop({ asset, face, size = 96, zoom = 1.9, className }: { as
 export function FaceOutline({ asset, face, aspect }: { asset: MediaAsset; face: FaceInstance; aspect: number }) {
   const p = coverBox(face.box, asset.w / asset.h, aspect, 0.2)
   return <span className="pointer-events-none absolute rounded-[40%] border-2 border-white shadow-[0_0_0_2px_rgba(29,78,216,.55)]" style={{ left: `${p.left}%`, top: `${p.top}%`, width: `${p.width}%`, height: `${p.height}%` }} />
+}
+
+const RING = { ok: 'border-[#34d399]', blocked: 'border-[#fb923c]', unknown: 'border-[#93c5fd]' } as const
+const RING_TEXT = { ok: 'text-ok', blocked: 'text-warn', unknown: 'text-info' } as const
+
+/** Clickable face rings with plain labels (adults read "Adult", not "Unknown"). Render inside PhotoFaces. */
+export function FaceRings({ asset, evals, aspect, blur, selectedId, onSelect }: { asset: MediaAsset; evals: FaceEval[]; aspect?: number; blur?: boolean; selectedId?: string | null; onSelect: (id: string) => void }) {
+  const ia = asset.w / asset.h
+  return (
+    <>
+      {evals.map((fe) => {
+        const p = coverBox(fe.face.box, ia, aspect ?? ia, blur && fe.state === 'blocked' ? 0.18 : 0.08)
+        const label = fe.face.review === 'non-student' ? 'Adult' : fe.face.review === 'always-blur' ? 'Always blur' : fe.student ? firstName(fe.student.name) : 'Unknown'
+        return (
+          <button key={fe.face.id} type="button" onClick={() => onSelect(fe.face.id)} aria-label={`Face: ${fe.student?.name ?? label}`} aria-pressed={selectedId === fe.face.id}
+            className={cn('absolute rounded-[40%] border-2 transition-transform hover:scale-105', RING[fe.state], selectedId === fe.face.id && 'ring-4 ring-white/70')}
+            style={{ left: `${p.left}%`, top: `${p.top}%`, width: `${p.width}%`, height: `${p.height}%` }}>
+            <span className={cn('absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold shadow', fe.face.review === 'non-student' ? 'text-ink-2' : RING_TEXT[fe.state])}>{label}</span>
+          </button>
+        )
+      })}
+    </>
+  )
 }
 
 const statusIcon: Record<PermissionStatus, React.ReactNode> = {

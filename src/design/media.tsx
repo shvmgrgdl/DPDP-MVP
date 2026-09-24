@@ -49,7 +49,7 @@ export interface PhotoFacesProps {
   loading?: 'lazy' | 'eager'
 }
 
-const ringCls = { ok: 'border-[#34d399]', blocked: 'border-[#fb923c]', unknown: 'border-[#93c5fd]' } as const
+const ringCls = { ok: 'border-[#34d399]', blocked: 'border-[#fb923c]', unknown: 'border-[#93c5fd]', adult: 'border-white/80' } as const
 
 export function PhotoFaces({ asset, evals, aspect, rings, names, blurBlocked, blurUnknown, blurStyle = 'soft', blurIds, selectedFaceId, onFaceClick, className, rounded = 'rounded-xl', children, loading = 'lazy' }: PhotoFacesProps) {
   const imgAspect = asset.w / asset.h
@@ -61,6 +61,7 @@ export function PhotoFaces({ asset, evals, aspect, rings, names, blurBlocked, bl
       {asset.faces.map((f) => {
         const e = evals?.find((x) => x.face.id === f.id)
         const state = e?.state ?? (f.studentId ? 'ok' : 'unknown')
+        const adult = f.review === 'non-student'
         const doBlur = blurIds ? blurIds.has(f.id) : (blurBlocked && state === 'blocked') || (blurUnknown && state === 'unknown')
         const pos = coverBox(f.box, imgAspect, ca, doBlur ? 0.18 : 0.08)
         const st = students.find((s) => s.id === f.studentId)
@@ -70,12 +71,12 @@ export function PhotoFaces({ asset, evals, aspect, rings, names, blurBlocked, bl
             {doBlur && <BlurPatch style={style} kind={blurStyle} />}
             {rings && (
               <button type="button" onClick={onFaceClick ? () => onFaceClick(f.id) : undefined} aria-label={st ? `Face: ${st.name}` : 'Unknown face'}
-                className={cn('absolute rounded-[40%] border-2 transition-all', ringCls[state], onFaceClick ? 'cursor-pointer hover:scale-105' : 'pointer-events-none', selectedFaceId === f.id && 'ring-4 ring-white/70')}
+                className={cn('absolute rounded-[40%] border-2 transition-all', adult ? ringCls.adult : ringCls[state], onFaceClick ? 'cursor-pointer hover:scale-105' : 'pointer-events-none', selectedFaceId === f.id && 'ring-4 ring-white/70')}
                 style={style}>
                 {names && (
                   <span className={cn('absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold shadow',
-                    state === 'ok' ? 'bg-white text-ok' : state === 'blocked' ? 'bg-white text-warn' : 'bg-white text-info')}>
-                    {st ? st.name.split(' ')[0] : 'Unknown'}
+                    adult ? 'bg-white text-ink-2' : state === 'ok' ? 'bg-white text-ok' : state === 'blocked' ? 'bg-white text-warn' : 'bg-white text-info')}>
+                    {st ? st.name.split(' ')[0] : adult ? 'Adult' : 'Unknown'}
                   </span>
                 )}
               </button>

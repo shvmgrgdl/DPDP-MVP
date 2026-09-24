@@ -1,28 +1,29 @@
 /**
  * Shared in-browser face AI for School DPDP OS (owned by the media-upload module; other modules may import).
  * Runs @vladmandic/face-api on TensorFlow.js in the browser: photos never leave the device.
- * The library (~1.3 MB) is loaded lazily on the first loadModels()/detectFaces() call, so importing a
- * light helper such as personToStudent() or downscaleToDataUrl() costs nothing.
+ * The library (~1.3 MB) loads lazily on the first loadModels()/detectFaces() call, so importing a light
+ * helper such as personToStudent() or downscaleToDataUrl() costs nothing.
  *
  * STABLE API
  *   loadModels(): Promise<FaceEngineInfo>
- *       Idempotent. Loads SSD MobileNet v1 + 68-point landmarks + 128-d recognition from /models/face-api/
- *       on TF.js (webgl → wasm → cpu fallback) and warms up. Progress is published on useFaceEngine.
+ *       Idempotent. SSD MobileNet v1 + 68-point landmarks + 128-d recognition from /models/face-api/,
+ *       TF.js backend webgl → wasm → software webgl → cpu, then a warm-up. Progress is published on useFaceEngine.
  *   useFaceEngine: zustand hook → { status: 'idle'|'loading'|'ready'|'error', progress 0..1, stage, backend, error? }
- *   detectFaces(input: HTMLImageElement|HTMLCanvasElement|HTMLVideoElement,
- *               { minConfidence = 0.35, descriptors = true, maxResults = 100, detector = 'ssd', inputSize = 416 })
- *       → Promise<DetectedFace[]>  where DetectedFace = { box: [x, y, w, h] normalised 0..1, score, descriptor?: Float32Array }
- *       Faces are sorted largest first. detector 'tiny' (lazy-loaded, descriptors ignored) is for fast video loops.
- *   loadDescriptors(force?): Promise<DescriptorIndex>   fetches /media/descriptors.json once ({ [personId]: number[] });
+ *   modelsReady(): boolean · getBackend(): string | null
+ *   detectFaces(input: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, opts?) → Promise<DetectedFace[]>
+ *       opts: { minConfidence = 0.35, descriptors = true, maxResults = 100, tiles = 'auto', detector = 'ssd', inputSize = 416 }
+ *       DetectedFace = { box: [x, y, w, h] normalised 0..1, score, descriptor?: Float32Array }, sorted largest first.
+ *       tiles 'auto' adds overlapping close-up passes on large photos so small faces in group shots are found.
+ *       detector 'tiny' (lazy-loaded, no descriptors, no tiles) is for fast video loops.
+ *   loadDescriptors(force?): Promise<DescriptorIndex>   /media/descriptors.json fetched once ({ [personId]: number[] });
  *       a missing file (404 or the dev server's HTML fallback) resolves to an empty index.
  *   matchDescriptor(desc, threshold = 0.5): Promise<{ personId, distance } | null>   best match below threshold
- *   matchFaces(descs, threshold = 0.5): Promise<(FaceMatch | null)[]>  one-to-one within a photo (no person twice)
- *   personToStudent(personId): string | null            via useApp.getState().faceIndex
- *   matchConfidence(distance): number 0..1              friendly confidence for UI
+ *   matchFaces(descs, threshold = 0.5): Promise<(FaceMatch | null)[]>  one photo at once; no person used twice
+ *   personToStudent(personId): string | null             via useApp.getState().faceIndex
+ *   matchConfidence(distance): number 0..1               friendly confidence for UI
  *   downscaleToDataUrl(file: Blob | string, max = 1600): Promise<string>   JPEG data URL, long edge ≤ max
  *   downscaleImage(file: Blob | string, max = 1600, quality = 0.86): Promise<{ dataUrl, w, h, canvas }>
- *   loadImage(src): Promise<HTMLImageElement>
- *   fingerprint(blob): Promise<string>                   SHA-256 hex of the original file bytes
+ *   loadImage(src): Promise<HTMLImageElement> · fingerprint(blob): Promise<string> (SHA-256 hex)
  *   MATCH_THRESHOLD, MODEL_URL, DESCRIPTORS_URL, FACE_MODEL_INFO
  */
 import { create } from 'zustand'
@@ -45,6 +46,8 @@ export interface DetectOptions {
   minConfidence?: number
   descriptors?: boolean
   maxResults?: number
+  /** Extra close-up passes for small faces: 'auto' = on for large inputs when a GPU/WASM backend is active. */
+  tiles?: boolean | 'auto'
   /** 'ssd' (default, accurate) or 'tiny' (fast, for video; no descriptors). */
   detector?: 'ssd' | 'tiny'
   /** Tiny detector input size (multiple of 32). */
@@ -95,8 +98,9 @@ interface TfRuntime {
   setBackend(name: string): Promise<boolean>
   ready(): Promise<void>
   getBackend(): string
-  findBackend(name: string): unknown
+  findBackendFactory(name: string): unknown
   setWasmPaths?(prefix: string): void
+  env(): { set(flag: string, value: unknown): void }
   scalar(v: number): { add(o: unknown): { dataSync(): ArrayLike<number>; dispose(): void }; dispose(): void }
 }
 
@@ -106,7 +110,8 @@ function getLib(): Promise<FaceApi> {
   if (lib) return Promise.resolve(lib)
   if (!libPromise) {
     libPromise = import('@vladmandic/face-api').then((m) => {
-      lib = ((m as unknown as { default?: FaceApi }).default?.nets ? (m as unknown as { default: FaceApi }).default : m) as FaceApi
+      const mod = m as unknown as FaceApi & { default?: FaceApi }
+      lib = mod.nets ? mod : (mod.default as FaceApi)
       return lib
     })
     libPromise.catch(() => { libPromise = null })
@@ -125,10 +130,22 @@ function hasWebGL() {
   }
 }
 
+async function reachable(url: string, ms = 3000) {
+  const ctl = new AbortController()
+  const t = setTimeout(() => ctl.abort(), ms)
+  try {
+    const res = await fetch(url, { method: 'HEAD', signal: ctl.signal })
+    return res.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 async function tryBackend(tf: TfRuntime, name: string): Promise<boolean> {
   try {
-    if (!tf.findBackend(name)) return false
-    if (name === 'wasm') tf.setWasmPaths?.(WASM_CDN)
+    if (!tf.findBackendFactory(name)) return false
     const ok = await tf.setBackend(name)
     if (!ok) return false
     await tf.ready()
@@ -143,10 +160,20 @@ async function tryBackend(tf: TfRuntime, name: string): Promise<boolean> {
   }
 }
 
+/** GPU first; WASM (from CDN, only if reachable); software WebGL; plain CPU last. */
 async function initBackend(fa: FaceApi): Promise<string> {
   const tf = fa.tf as unknown as TfRuntime
-  const order = hasWebGL() ? ['webgl', 'wasm', 'cpu'] : ['wasm', 'cpu']
-  for (const name of order) if (await tryBackend(tf, name)) return name
+  const gl = hasWebGL()
+  if (gl && (await tryBackend(tf, 'webgl'))) return 'webgl'
+  if (tf.setWasmPaths && tf.findBackendFactory('wasm') && (await reachable(`${WASM_CDN}tfjs-backend-wasm-simd.wasm`))) {
+    tf.setWasmPaths(WASM_CDN)
+    if (await tryBackend(tf, 'wasm')) return 'wasm'
+  }
+  if (gl) {
+    try { tf.env().set('SOFTWARE_WEBGL_ENABLED', true) } catch { /* older tfjs */ }
+    if (await tryBackend(tf, 'webgl')) return 'webgl'
+  }
+  if (await tryBackend(tf, 'cpu')) return 'cpu'
   throw new Error('No TensorFlow.js backend is available in this browser')
 }
 
@@ -194,9 +221,9 @@ async function doLoadModels(): Promise<FaceEngineInfo> {
   const nets = fa.nets
   // Weighted by model size: detector 5.6 MB, landmarks 0.35 MB, recognition 6.4 MB.
   await Promise.all([
-    nets.ssdMobilenetv1.isLoaded ? bump(0.33) : nets.ssdMobilenetv1.loadFromUri(MODEL_URL).then(() => bump(0.33, 'Face finder ready')),
+    nets.ssdMobilenetv1.isLoaded ? bump(0.3) : nets.ssdMobilenetv1.loadFromUri(MODEL_URL).then(() => bump(0.3, 'Face finder ready')),
     nets.faceLandmark68Net.isLoaded ? bump(0.05) : nets.faceLandmark68Net.loadFromUri(MODEL_URL).then(() => bump(0.05)),
-    nets.faceRecognitionNet.isLoaded ? bump(0.33) : nets.faceRecognitionNet.loadFromUri(MODEL_URL).then(() => bump(0.33, 'Face matcher ready')),
+    nets.faceRecognitionNet.isLoaded ? bump(0.3) : nets.faceRecognitionNet.loadFromUri(MODEL_URL).then(() => bump(0.3, 'Face matcher ready')),
   ])
   bump(0.02, 'Warming up')
   await warmUp(fa)
@@ -216,7 +243,7 @@ async function warmUp(fa: FaceApi) {
       g.fillStyle = '#d9c8b4'
       g.fillRect(0, 0, 160, 160)
     }
-    await fa.detectAllFaces(c, new fa.SsdMobilenetv1Options({ minConfidence: 0.9 }))
+    await fa.nets.ssdMobilenetv1.locateFaces(c, new fa.SsdMobilenetv1Options({ minConfidence: 0.9 }))
     await fa.nets.faceLandmark68Net.detectLandmarks(c)
     await fa.nets.faceRecognitionNet.computeFaceDescriptor(c)
   } catch {
@@ -239,6 +266,7 @@ function loadTiny(fa: FaceApi) {
 /* ------------------------------------------------------------------ */
 
 type MediaInput = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
+interface PxBox { x: number; y: number; w: number; h: number; score: number }
 
 function mediaDims(input: MediaInput) {
   if (input instanceof HTMLImageElement) return { w: input.naturalWidth || input.width, h: input.naturalHeight || input.height }
@@ -264,9 +292,77 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
   return run
 }
 
+const TILE_MIN_SIDE = 900 // below this the single 512px pass already sees faces well
+function tileGrid(w: number, h: number) {
+  const T = Math.round(Math.max(480, Math.min(900, Math.max(w, h) * 0.52)))
+  const ov = Math.round(T * 0.28)
+  const axis = (len: number) => {
+    if (len <= T) return [0]
+    const n = Math.ceil((len - ov) / (T - ov))
+    return Array.from({ length: n }, (_, i) => Math.round((i * (len - T)) / (n - 1)))
+  }
+  const tiles: { x: number; y: number; w: number; h: number }[] = []
+  for (const y of axis(h)) for (const x of axis(w)) tiles.push({ x, y, w: Math.min(T, w), h: Math.min(T, h) })
+  return tiles
+}
+
+function toCanvas(input: MediaInput, w: number, h: number): HTMLCanvasElement {
+  if (input instanceof HTMLCanvasElement) return input
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  c.getContext('2d')?.drawImage(input, 0, 0, w, h)
+  return c
+}
+
+function iou(a: PxBox, b: PxBox) {
+  const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
+  const iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
+  const inter = ix * iy
+  const small = Math.min(a.w * a.h, b.w * b.h)
+  return { iou: inter / (a.w * a.h + b.w * b.h - inter), contain: small ? inter / small : 0 }
+}
+
+/** Non-maximum suppression that also folds boxes nested inside a stronger one. */
+function mergeBoxes(boxes: PxBox[]) {
+  const sorted = [...boxes].sort((a, b) => b.score - a.score)
+  const keep: PxBox[] = []
+  for (const b of sorted) if (!keep.some((k) => { const o = iou(k, b); return o.iou > 0.3 || o.contain > 0.6 })) keep.push(b)
+  return keep
+}
+
+async function locate(fa: FaceApi, input: MediaInput, w: number, h: number, minConfidence: number, maxResults: number, tiles: boolean): Promise<PxBox[]> {
+  const opts = new fa.SsdMobilenetv1Options({ minConfidence, maxResults })
+  const full = await fa.nets.ssdMobilenetv1.locateFaces(input, opts)
+  const out: PxBox[] = full.map((d) => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height, score: d.score }))
+  if (!tiles) return out
+  const src = toCanvas(input, w, h)
+  // Close-up passes are stricter: more pixels also means more look-alike textures.
+  const tileOpts = new fa.SsdMobilenetv1Options({ minConfidence: Math.max(minConfidence, 0.5), maxResults })
+  const crop = document.createElement('canvas')
+  for (const t of tileGrid(w, h)) {
+    crop.width = t.w
+    crop.height = t.h
+    const g = crop.getContext('2d')
+    if (!g) break
+    g.drawImage(src, t.x, t.y, t.w, t.h, 0, 0, t.w, t.h)
+    const dets = await fa.nets.ssdMobilenetv1.locateFaces(crop, tileOpts)
+    for (const d of dets) {
+      const b = d.box
+      // a face cut by an inner tile edge is seen whole by the neighbouring tile or the full pass
+      const cut = (t.x > 0 && b.x <= 2) || (t.y > 0 && b.y <= 2) || (t.x + t.w < w && b.x + b.width >= t.w - 2) || (t.y + t.h < h && b.y + b.height >= t.h - 2)
+      if (cut) continue
+      // tiles are for small faces; large ones are the full pass's job
+      if (b.width > t.w * 0.45) continue
+      out.push({ x: b.x + t.x, y: b.y + t.y, w: b.width, h: b.height, score: d.score })
+    }
+  }
+  return mergeBoxes(out)
+}
+
 /** Find faces. Boxes are normalised to the input's natural size; results are sorted largest first. */
 export async function detectFaces(input: MediaInput, opts: DetectOptions = {}): Promise<DetectedFace[]> {
-  const { minConfidence = 0.35, descriptors = true, maxResults = 100, detector = 'ssd', inputSize = 416 } = opts
+  const { minConfidence = 0.35, descriptors = true, maxResults = 100, detector = 'ssd', inputSize = 416, tiles = 'auto' } = opts
   const { w, h } = mediaDims(input)
   if (!w || !h) return []
   const fa = await getLib()
@@ -275,14 +371,17 @@ export async function detectFaces(input: MediaInput, opts: DetectOptions = {}): 
     const dets = await serial(async () => await fa.detectAllFaces(input, new fa.TinyFaceDetectorOptions({ inputSize, scoreThreshold: minConfidence })))
     return sortBySize(dets.map((d) => ({ box: normBox(d.box, w, h), score: d.score })))
   }
-  await loadModels()
-  const options = new fa.SsdMobilenetv1Options({ minConfidence, maxResults })
-  if (!descriptors) {
-    const dets = await serial(async () => await fa.detectAllFaces(input, options))
-    return sortBySize(dets.map((d) => ({ box: normBox(d.box, w, h), score: d.score })))
-  }
-  const res = await serial(async () => await fa.detectAllFaces(input, options).withFaceLandmarks().withFaceDescriptors())
-  return sortBySize(res.map((r) => ({ box: normBox(r.detection.box, w, h), score: r.detection.score, descriptor: r.descriptor })))
+  const info = await loadModels()
+  const useTiles = tiles === 'auto' ? Math.max(w, h) >= TILE_MIN_SIDE && info.backend !== 'cpu' : tiles
+  return serial(async () => {
+    const boxes = await locate(fa, input, w, h, minConfidence, maxResults, useTiles)
+    if (!boxes.length) return []
+    if (!descriptors) return sortBySize(boxes.map((b) => ({ box: normBox({ x: b.x, y: b.y, width: b.w, height: b.h }, w, h), score: b.score })))
+    const dims = { width: w, height: h }
+    const src = boxes.map((b) => fa.extendWithFaceDetection({}, new fa.FaceDetection(b.score, new fa.Rect(b.x / w, b.y / h, b.w / w, b.h / h), dims)))
+    const res = await new fa.DetectAllFaceLandmarksTask(Promise.resolve(src), input, false).withFaceDescriptors()
+    return sortBySize(res.map((r) => ({ box: normBox(r.detection.box, w, h), score: r.detection.score, descriptor: r.descriptor })))
+  })
 }
 
 const sortBySize = (faces: DetectedFace[]) => faces.sort((a, b) => b.box[2] * b.box[3] - a.box[2] * a.box[3])
@@ -338,7 +437,7 @@ function euclidean(a: ArrayLike<number>, b: ArrayLike<number>) {
   return Math.sqrt(s)
 }
 
-function bestFor(index: DescriptorIndex, desc: ArrayLike<number>) {
+function rank(index: DescriptorIndex, desc: ArrayLike<number>) {
   const out: FaceMatch[] = []
   for (const [personId, refs] of index) {
     let min = Infinity
@@ -348,11 +447,13 @@ function bestFor(index: DescriptorIndex, desc: ArrayLike<number>) {
   return out.sort((a, b) => a.distance - b.distance)
 }
 
+const round3 = (v: number) => Math.round(v * 1000) / 1000
+
 /** Closest known person below the threshold, else null. */
 export async function matchDescriptor(desc: Float32Array | number[], threshold = MATCH_THRESHOLD): Promise<FaceMatch | null> {
   const index = await loadDescriptors()
   if (!index.size) return null
-  const best = bestFor(index, desc)[0]
+  const best = rank(index, desc)[0]
   return best && best.distance < threshold ? { personId: best.personId, distance: round3(best.distance) } : null
 }
 
@@ -364,7 +465,7 @@ export async function matchFaces(descs: (Float32Array | number[] | undefined)[],
   const pairs: { face: number; personId: string; distance: number }[] = []
   descs.forEach((d, face) => {
     if (!d) return
-    for (const m of bestFor(index, d)) if (m.distance < threshold) pairs.push({ face, ...m })
+    for (const m of rank(index, d)) if (m.distance < threshold) pairs.push({ face, ...m })
   })
   pairs.sort((a, b) => a.distance - b.distance)
   const usedPeople = new Set<string>()
@@ -375,8 +476,6 @@ export async function matchFaces(descs: (Float32Array | number[] | undefined)[],
   }
   return out
 }
-
-const round3 = (v: number) => Math.round(v * 1000) / 1000
 
 /** Manifest person → student id (null = stays unknown). */
 export function personToStudent(personId: string | null | undefined): string | null {
@@ -430,6 +529,8 @@ export async function downscaleImage(src: Blob | string, max = 1600, quality = 0
       source = img
       sw = img.naturalWidth
       sh = img.naturalHeight
+    } catch {
+      throw new Error('This file is not a readable image')
     } finally {
       setTimeout(() => URL.revokeObjectURL(url), 0)
     }

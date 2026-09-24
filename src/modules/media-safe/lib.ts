@@ -79,7 +79,12 @@ export const isUnknownFace = (f: FaceInstance) => f.review !== 'non-student' && 
 export const byId = (a: MediaAsset, b: MediaAsset) => a.id.localeCompare(b.id, 'en', { numeric: true })
 export const firstName = (n: string) => n.split(' ')[0]
 export const actorOf = (role: RoleKey) => ROLE[role].person || role
-export const photoLabel = (a: MediaAsset, idx?: number) => a.title || (idx !== undefined && idx >= 0 ? `Photo ${idx + 1}` : a.id)
+/** Display title: drops a leading "Event · " prefix (the event is shown alongside) and capitalises. */
+export function photoLabel(a: MediaAsset, idx?: number) {
+  const t = a.title?.includes(' · ') ? a.title.slice(a.title.indexOf(' · ') + 3) : a.title
+  if (t) return t.charAt(0).toUpperCase() + t.slice(1)
+  return idx !== undefined && idx >= 0 ? `Photo ${idx + 1}` : a.id
+}
 
 export const MONTH_START_MS = new Date(`${DEMO_NOW.slice(0, 7)}-01T00:00:00+05:30`).getTime()
 export const MONTH_LABEL = new Date(DEMO_NOW).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })

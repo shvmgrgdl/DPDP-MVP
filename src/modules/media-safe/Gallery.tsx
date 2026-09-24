@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { Archive, CalendarDays, Camera, Film, MapPin, Play, ShieldCheck, Upload, Users } from 'lucide-react'
 import type { Verdict } from '@/data/types'
 import { channelMap, evaluateAsset } from '@/engine/permission'
-import { DEST, VERDICT_META } from '@/data/reference'
+import { VERDICT_META } from '@/data/reference'
 import { Button, Card, Empty, PageHeader } from '@/design/ui'
 import { ChannelDots, PhotoFaces, VerdictChip } from '@/design/media'
 import { useApp } from '@/store/app'
@@ -63,7 +63,9 @@ export function Gallery() {
     <div>
       <Crumbs items={[{ label: 'Media Safe', to: '/media' }, { label: ev.name }]} />
       <PageHeader title={ev.name}
-        subtitle={`${photos.length} photo${photos.length === 1 ? '' : 's'}${videos.length ? ` · ${videos.length} video${videos.length === 1 ? '' : 's'}` : ''}${scope ? ` with Class ${scope} children` : ''}, each checked against every parent’s choice.`}
+        subtitle={photos.length || videos.length
+          ? `${photos.length} photo${photos.length === 1 ? '' : 's'}${videos.length ? ` · ${videos.length} video${videos.length === 1 ? '' : 's'}` : ''}${scope ? ` with Class ${scope} children` : ''}, each checked against every parent’s choice.`
+          : 'No photos yet. Each one is checked against every parent’s choice as it arrives.'}
         actions={<>
           <Button variant="secondary" icon={<Upload className="size-4" />} to={`/media/upload?event=${ev.id}`}>Upload photos</Button>
           {!scope && <Button icon={<ShieldCheck className="size-4" />} to={`/publish?event=${ev.id}`}>Open Publish Guard</Button>}
@@ -106,7 +108,7 @@ export function Gallery() {
           <Empty title={`Nothing under “${show === 'all' ? 'All' : VERDICT_META[show].label}” for ${DEST_LABEL[dest]}`} body="Try another filter or destination." action={<Button variant="secondary" onClick={() => setShow('all')}>Show all photos</Button>} />
         </Card>
       ) : (
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {shown.map((e) => {
             const unknown = e.asset.faces.filter(isUnknownFace).length
             return (
@@ -139,7 +141,7 @@ export function Gallery() {
             <h2 className="text-[15px] font-semibold text-ink">Videos</h2>
             <Link to="/video" className="text-[13px] font-semibold text-azure hover:underline">Open Video Studio</Link>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {videos.map((v) => {
               const verdict = evaluateAsset(ctx, v, dest).verdict
               return (
@@ -159,7 +161,6 @@ export function Gallery() {
           </div>
         </section>
       )}
-      <p className="mt-8 text-[11px] text-ink-3">{DEST[dest].label}: {DEST[dest].note ?? 'blurring allowed where the main child is cleared.'}</p>
     </div>
   )
 }

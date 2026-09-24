@@ -1,19 +1,27 @@
-import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
-
-function Placeholder() {
-  return (
-    <div>
-      <PageHeader eyebrow="Settings" title="Settings" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
-    </div>
-  )
-}
+import { Routes, Route, Navigate } from 'react-router'
+import Layout from './Layout'
+import Profile from './Profile'
+import People from './People'
+import Notifications from './Notifications'
+import Languages from './Languages'
+import Integrations from './Integrations'
+import Plan from './Plan'
+import Credits from './Credits'
 
 export default function Module() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route element={<Layout />}>
+        <Route index element={<Navigate to="profile" replace />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="people" element={<People />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="languages" element={<Languages />} />
+        <Route path="integrations" element={<Integrations />} />
+        <Route path="plan" element={<Plan />} />
+        <Route path="credits" element={<Credits />} />
+        <Route path="*" element={<Navigate to="profile" replace />} />
+      </Route>
     </Routes>
   )
 }
