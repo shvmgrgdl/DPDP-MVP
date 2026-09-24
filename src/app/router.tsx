@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router'
+import { createHashRouter, Navigate } from 'react-router'
 import { AppShell } from '@/shell/AppShell'
 import { useApp } from '@/store/app'
 import { ROLE } from '@/roles/roles'
@@ -10,7 +10,7 @@ function RoleHome() {
 
 const mod = (loader: () => Promise<{ default: React.ComponentType }>) => async () => ({ Component: (await loader()).default })
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   { path: '/login', lazy: mod(() => import('@/modules/auth')) },
   { path: '/privacy-centre/*', lazy: mod(() => import('@/modules/privacy-hub/PublicPrivacyCentre')) },
   {

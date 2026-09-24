@@ -77,8 +77,8 @@ export interface FaceEngineInfo {
   loadMs: number
 }
 
-export const MODEL_URL = '/models/face-api'
-export const DESCRIPTORS_URL = '/media/descriptors.json'
+export const MODEL_URL = 'models/face-api'
+export const DESCRIPTORS_URL = 'media/descriptors.json'
 export const MATCH_THRESHOLD = 0.5
 export const FACE_MODEL_INFO = {
   detector: 'SSD MobileNet v1',

@@ -14,10 +14,10 @@ for (const spec of specs) {
   const page = await browser.newPage({ viewport: { width: w, height: h } })
   page.on('pageerror', (e) => errors.push(`${spec}: ${e.message}`))
   page.on('console', (m) => m.type() === 'error' && errors.push(`${spec}: ${m.text()}`))
-  await page.goto(base + '/')
+  await page.goto(base + '/#/')
   await page.waitForFunction(() => window.__app && window.__app.getState().hydrated, null, { timeout: 20000 })
   await page.evaluate((r) => window.__app.getState().setRole(r), role)
-  await page.goto(base + path)
+  await page.goto(base + '/#' + path)
   await page.waitForTimeout(1500)
   const file = `${out}/${role}${path.replace(/\//g, '_')}.png`
   await page.screenshot({ path: file, fullPage: process.env.FULL === '1' })

@@ -8,7 +8,7 @@ import { personToStudent } from '@/media/face'
 import { useStudio } from './store'
 import type { Frame, LocalVideo, VideoEntry } from './types'
 
-const FOLDER = '/media/video/'
+const FOLDER = 'media/video/'
 const VIDEO_EXT = /\.(mp4|m4v|webm|mov|ogv)$/i
 
 const basename = (src: string) => decodeURIComponent(src.split('?')[0].split('#')[0].split('/').pop() ?? src)
@@ -51,7 +51,7 @@ function folderEntry(item: unknown): VideoEntry | null {
   if (!o || typeof o !== 'object') return null
   const rawSrc = [o.src, o.file, o.url, o.path, o.name].find((x) => typeof x === 'string') as string | undefined
   if (!rawSrc || !VIDEO_EXT.test(pathOf(rawSrc))) return null
-  const src = /^(https?:|blob:|\/)/.test(rawSrc) ? rawSrc : rawSrc.startsWith('media/') ? `/${rawSrc}` : FOLDER + rawSrc
+  const src = /^(https?:|blob:|data:)/.test(rawSrc) ? rawSrc : rawSrc.startsWith('/') ? rawSrc.slice(1) : rawSrc.startsWith('media/') ? rawSrc : FOLDER + rawSrc
   const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
   return {
     id: typeof o.id === 'string' && o.id ? o.id : `clip-${slug(basename(src))}`,

@@ -6,7 +6,7 @@ import type {
 } from '../types'
 import { MEDIA_PURPOSES } from '../reference'
 import { FIRST_F, FIRST_M, HOUSES, PARENT_F, PARENT_M, SURNAMES } from './names'
-import { addDays, addHours, DEMO_NOW, pick, rng, sha256 } from '@/lib/utils'
+import { addDays, addHours, DEMO_NOW, pick, pub, rng, sha256 } from '@/lib/utils'
 
 export interface ManifestFace { box: [number, number, number, number]; person: string | null; score: number; main?: boolean; adult?: boolean }
 export interface ManifestAsset { id: string; event: string; src: string; w: number; h: number; faces: ManifestFace[]; title?: string }
@@ -296,7 +296,7 @@ export function createSeed(): AppData {
   for (const a of m.assets) {
     const ev0 = events.find((e) => e.id === a.event) ?? events[0]
     assets.push({
-      id: a.id, eventId: ev0.id, kind: 'photo', src: a.src, w: a.w, h: a.h, title: a.title,
+      id: a.id, eventId: ev0.id, kind: 'photo', src: pub(a.src), w: a.w, h: a.h, title: a.title,
       capturedAt: addHours(ev0.date, Math.floor(r() * 3)), uploadedBy: ev0.photographerIds[0] ?? 'U-MKT',
       faces: a.faces.map((f, i) => {
         if (f.adult) return { id: `${a.id}-f${i}`, box: f.box, studentId: null, confidence: 0, review: 'non-student' as const, main: !!f.main }
@@ -309,7 +309,7 @@ export function createSeed(): AppData {
     const ev0 = events.find((e) => e.id === v.event) ?? events[0]
     const tracks = v.tracks.map((t) => ({ trackId: t.trackId, studentId: t.person ? personToStudent.get(t.person) ?? null : null, frames: t.frames }))
     assets.push({
-      id: v.id, eventId: ev0.id, kind: 'video', src: v.src, w: v.w, h: v.h, duration: v.duration, title: v.title,
+      id: v.id, eventId: ev0.id, kind: 'video', src: pub(v.src), w: v.w, h: v.h, duration: v.duration, title: v.title,
       capturedAt: ev0.date, uploadedBy: 'U-PHOTO', tracks,
       faces: tracks.map((t, i) => ({ id: `${v.id}-f${i}`, box: [t.frames[0]?.[1] ?? 0, t.frames[0]?.[2] ?? 0, t.frames[0]?.[3] ?? 0, t.frames[0]?.[4] ?? 0], studentId: t.studentId, confidence: t.studentId ? 0.95 : 0, review: t.studentId ? 'auto' : 'unknown', main: false })),
     })

@@ -6,10 +6,10 @@ export interface SampleRef {
   event?: string
 }
 
-const BASE = '/media/upload-samples/'
+const BASE = 'media/upload-samples/'
 let cache: Promise<SampleRef[]> | null = null
 
-const resolve = (p: string) => (/^(https?:)?\//.test(p) ? p : BASE + p.replace(/^\.\//, ''))
+const resolve = (p: string) => (/^(https?:)?\/\//.test(p) ? p : p.startsWith('/') ? p.slice(1) : BASE + p.replace(/^\.\//, ''))
 
 export function discoverSamples(): Promise<SampleRef[]> {
   if (!cache) {

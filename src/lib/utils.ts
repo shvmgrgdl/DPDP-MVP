@@ -1,6 +1,9 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
+/** Public-folder URL that works under any base path (hash routing keeps the document at the app root). */
+export const pub = (p: string) => (p.startsWith('/') && !p.startsWith('//') ? p.slice(1) : p)
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }

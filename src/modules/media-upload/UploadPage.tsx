@@ -488,7 +488,7 @@ function PhotographerAccessCard() {
   const state = accessState(v, now)
   if (!v?.access) return null
   const left = countdown(new Date(v.access.expiresAt).getTime() - now)
-  const link = `${window.location.origin}/media/upload/portal?token=${v.access.token}`
+  const link = `${window.location.href.split('#')[0]}#/media/upload/portal?token=${v.access.token}`
   return (
     <Card className="p-6">
       <div className="flex items-start justify-between gap-3">
