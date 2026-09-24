@@ -78,8 +78,16 @@ export function actorId() {
   return ROLE[s.role].person || s.role
 }
 
-/** Where "Check faces" goes: the face review queue, focused on this photo. */
-export const reviewLink = (assetId: string) => `/media/review?asset=${encodeURIComponent(assetId)}`
+/** Media Safe's queue for faces we couldn't recognise. */
+export const REVIEW_LINK = '/media/review'
+
+/** Media Safe photo page (face-by-face reasons). It understands ?dest= for these four destinations. */
+const MEDIA_SAFE_DEST: Partial<Record<DestinationKey, string>> = { instagram: 'instagram', website: 'website', print: 'print', 'private-gallery': 'private-gallery' }
+const BY_PURPOSE: Record<string, string> = { 'public-digital': 'instagram', promotion: 'print', 'private-gallery': 'private-gallery' }
+export function photoLink(assetId: string, dest?: DestinationKey) {
+  const md = dest ? MEDIA_SAFE_DEST[dest] ?? BY_PURPOSE[DEST[dest].purpose] : undefined
+  return `/media/photos/${encodeURIComponent(assetId)}${md ? `?dest=${md}` : ''}`
+}
 
 /* ------------------------------------------------------------------ motion */
 

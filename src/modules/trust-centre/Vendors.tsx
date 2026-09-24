@@ -62,7 +62,7 @@ function VendorCard({ vendor, onOpen }: { vendor: Vendor; onOpen: () => void }) 
     <Card className="flex flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <button type="button" onClick={onOpen} className="min-w-0 text-left hover:underline">
-          <div className="truncate text-[15px] font-semibold text-ink">{vendor.name}</div>
+          <div className="text-[15px] font-semibold leading-snug text-ink">{vendor.name}</div>
           <div className="text-xs text-ink-3">{vendor.category} · {vendor.service}</div>
         </button>
         <Chip tone={RISK_TONE[vendor.riskTier]} size="sm" icon={false} className="shrink-0 capitalize">{vendor.riskTier} risk</Chip>

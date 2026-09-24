@@ -15,7 +15,7 @@ import { useApp } from '@/store/app'
 import { useAsset, useCan, useCtx } from '@/store/hooks'
 import { cn, fmtDate } from '@/lib/utils'
 import { BLUR_STYLES, STRENGTH, baseCanvas, canvasToJpeg, downloadBlob, fileStem, loadImage, regionNorm, renderBlurred, type BlurTarget } from './blur'
-import { DestIcon, actorId, isDest, reviewLink } from './shared'
+import { DestIcon, REVIEW_LINK, actorId, isDest, photoLink } from './shared'
 
 const PREVIEW_MAX = 1400
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -145,9 +145,7 @@ function Studio({ asset }: { asset: MediaAsset }) {
       maxSide: PREVIEW_MAX, watermark: watermark ? wmText : null, canvas: processedRef.current ?? undefined,
     })
     paint()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [img, targetsKey, style, strength, watermark, wmText])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => paint(), [split])
 
   /* ---------------- fit the photo to the stage ---------------- */
@@ -452,7 +450,7 @@ function Studio({ asset }: { asset: MediaAsset }) {
             {uncovered.length > 0 && d.blurFixAllowed && (
               <p className="mt-2.5 text-[12px] leading-snug text-warn">
                 {uncovered.length} face{uncovered.length > 1 ? 's' : ''} without permission {uncovered.length > 1 ? 'are' : 'is'} still visible. Blur {uncovered.length > 1 ? 'them' : 'it'}, or{' '}
-                <Link to={reviewLink(asset.id)} className="font-semibold underline">check faces</Link> if {uncovered.length > 1 ? 'they are adults' : 'it is an adult'}.
+                <Link to={uncovered.some((f) => f.state === 'unknown') ? REVIEW_LINK : photoLink(asset.id, dest)} className="font-semibold underline">check faces</Link> if {uncovered.length > 1 ? 'they are adults' : 'it is an adult'}.
               </p>
             )}
             {!canExport && <p className="mt-2.5 text-[12px] text-warn">Only Marketing or the Principal can export.</p>}

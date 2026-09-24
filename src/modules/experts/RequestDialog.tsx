@@ -5,7 +5,7 @@ import { Dialog, Button, Field, Input, Textarea, Select } from '@/design/ui'
 import { useApp } from '@/store/app'
 import { ROLE } from '@/roles/roles'
 import { EXPERTS } from '@/data/reference'
-import type { ExpertKind } from '@/data/types'
+import type { Evidence, ExpertKind } from '@/data/types'
 import { fmtDateTime, nowIso } from '@/lib/utils'
 import { KIND_EVIDENCE } from './data'
 
@@ -24,19 +24,39 @@ export function RequestDialog({ open, onOpenChange, defaultKind, prefillTitle, p
   const [title, setTitle] = React.useState('')
   const [description, setDescription] = React.useState('')
   const [picked, setPicked] = React.useState<Set<string>>(new Set())
-  const recent = React.useMemo(() => [...evidence].slice(-14).reverse(), [evidence])
 
+  // Evidence matching this kind, most recent first — searched across the whole log, not just a
+  // recency window (the seed's 40 near-daily access-log entries would otherwise crowd everything
+  // else out of "most recent").
+  const relevantPool = React.useMemo(
+    () => [...evidence].filter((e) => KIND_EVIDENCE[kind].includes(e.type)).sort((a, b) => b.at.localeCompare(a.at)),
+    [evidence, kind],
+  )
+  // Shown list: relevant matches first (so preselected items are always visible), then general recent activity.
+  const recent = React.useMemo(() => {
+    const byRecency = [...evidence].sort((a, b) => b.at.localeCompare(a.at))
+    const seen = new Set<string>()
+    const list: Evidence[] = []
+    for (const e of relevantPool) { if (list.length >= 6) break; seen.add(e.id); list.push(e) }
+    for (const e of byRecency) { if (list.length >= 14) break; if (!seen.has(e.id)) { seen.add(e.id); list.push(e) } }
+    return list
+  }, [evidence, relevantPool])
+
+  // Reset fields for a new dialog session.
   React.useEffect(() => {
     if (!open) return
-    const k = defaultKind ?? 'managed-desk'
-    setKind(k)
+    setKind(defaultKind ?? 'managed-desk')
     setTitle(prefillTitle ?? '')
     setDescription(prefillDescription ?? '')
-    const relevant = KIND_EVIDENCE[k]
-    setPicked(new Set([...evidence].slice(-14).reverse().filter((e) => relevant.includes(e.type)).slice(0, 4).map((e) => e.id)))
-    // preselect once per open/kind change; user may freely edit afterwards
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultKind])
+
+  // Refresh preselected evidence whenever the chosen kind changes (initial open, or a manual switch).
+  React.useEffect(() => {
+    if (!open) return
+    setPicked(new Set(relevantPool.slice(0, 4).map((e) => e.id)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, kind])
 
   const meta = EXPERTS.find((e) => e.kind === kind)!
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })

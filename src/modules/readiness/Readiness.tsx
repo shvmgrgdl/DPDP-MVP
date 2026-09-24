@@ -117,19 +117,39 @@ function Intro({ onStart, onFresh, onSkip }: { onStart: () => void; onFresh: () 
               </div>
             </div>
           </div>
-          <div className="relative border-t border-line bg-[#fbfaf7] px-8 py-5 lg:px-12">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 text-[13px] text-ink-2">
-              <span className="font-semibold text-ink">{total} questions in {FAMILIES.length} short sections</span>
+          <div className="relative border-t border-line bg-[#fbfaf7] px-8 py-6 lg:px-12">
+            <div className="text-[13px] font-semibold text-ink">{total} questions in {FAMILIES.length} short sections</div>
+            <ol className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4 xl:grid-cols-7">
               {FAMILIES.map((f, i) => (
-                <span key={f.key} className="flex items-center gap-2">
-                  <span className="flex size-5 items-center justify-center rounded-full border border-line-strong bg-surface text-[10.5px] font-bold text-ink-2">{i + 1}</span>
-                  {f.label}
-                </span>
+                <li key={f.key} className="flex items-start gap-2">
+                  <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full border border-line-strong bg-surface text-[10.5px] font-bold text-ink-2">{i + 1}</span>
+                  <span className="min-w-0 leading-tight">
+                    <span className="block text-[13px] font-medium text-ink">{f.label}</span>
+                    <span className="mt-0.5 block text-[11.5px] text-ink-3">{f.blurb}</span>
+                  </span>
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
         </div>
       </Rise>
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        {[
+          { icon: Sparkles, title: `Pre-filled for ${school.shortName}`, body: 'From your admission records, vendor list and settings. Change anything that isn’t right.' },
+          { icon: Landmark, title: 'Exemptions recognised', body: 'Attendance, child-safety CCTV and the school bus are recognised as school exemptions, so no extra forms.' },
+          { icon: ListPlus, title: 'A plan, not a score', body: 'Every item lands in one of four buckets, with an owner and a due date. Nothing to grade.' },
+        ].map((x, i) => (
+          <Rise key={x.title} i={2 + i}>
+            <div className="flex h-full items-start gap-3.5 rounded-2xl border border-line/80 bg-surface/60 px-5 py-4">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-canvas text-navy-2 ring-1 ring-line"><x.icon className="size-[18px]" /></span>
+              <div>
+                <div className="text-[14.5px] font-semibold text-ink">{x.title}</div>
+                <p className="mt-0.5 text-[13px] leading-snug text-ink-2">{x.body}</p>
+              </div>
+            </div>
+          </Rise>
+        ))}
+      </div>
     </div>
   )
 }
@@ -192,15 +212,21 @@ function OptionTile({ q, o, selected, onPick, compact }: { q: Question; o: Quest
     <button type="button" role={multi ? 'checkbox' : 'radio'} aria-checked={selected} onClick={onPick}
       className={cn('group flex w-full items-center gap-3 rounded-xl border text-left transition-all duration-200',
         compact ? 'px-3 py-2.5' : 'px-4 py-3.5',
-        selected ? 'border-azure bg-azure-50/70 ring-1 ring-azure' : 'border-line-strong bg-surface hover:border-ink-3/50 hover:bg-[#fbfaf7]')}>
+        selected ? (multi ? 'border-azure/60 bg-azure-50/60' : 'border-azure bg-azure-50/70 ring-1 ring-azure') : 'border-line-strong bg-surface hover:border-ink-3/50 hover:bg-[#fbfaf7]')}>
       <span className={cn('flex size-[18px] shrink-0 items-center justify-center border-2 transition-colors', multi ? 'rounded-[5px]' : 'rounded-full',
         selected ? (multi ? 'border-azure bg-azure text-white' : 'border-azure') : 'border-line-strong group-hover:border-ink-3')}>
         {selected && (multi ? <Check className="size-3" strokeWidth={3.2} /> : <span className="size-2 rounded-full bg-azure" />)}
       </span>
-      <span className="min-w-0 flex-1">
-        <span className={cn('block font-medium leading-snug text-ink', compact ? 'text-[14px]' : 'text-[15px]')}>{o.label}</span>
-        {o.hint && <span className={cn('mt-0.5 block leading-snug text-ink-3', compact ? 'text-[12px]' : 'text-[13px]')}>{o.hint}</span>}
-      </span>
+      {compact ? (
+        <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-snug text-ink">
+          {o.label}{o.hint && <span className="font-normal text-ink-3"> · {o.hint}</span>}
+        </span>
+      ) : (
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-medium leading-snug text-ink">{o.label}</span>
+          {o.hint && <span className="mt-0.5 block text-[13px] leading-snug text-ink-3">{o.hint}</span>}
+        </span>
+      )}
     </button>
   )
 }
@@ -234,7 +260,7 @@ function QuestionCard({ q, pos, total, dir, answer, prefilled, onPick, onBack, o
             <div role={q.kind === 'multi' ? 'group' : 'radiogroup'} aria-label={q.prompt}
               className={cn('mt-7 grid gap-2.5', cols === 2 && 'sm:grid-cols-2', cols === 3 && 'sm:grid-cols-2 2xl:grid-cols-3')}>
               {q.options.map((o) => (
-                <OptionTile key={o.value} q={q} o={o} compact={cols === 3} selected={(answer ?? []).includes(o.value)} onPick={() => onPick(o.value)} />
+                <OptionTile key={o.value} q={q} o={o} compact={q.kind === 'multi' && q.options.length > 6} selected={(answer ?? []).includes(o.value)} onPick={() => onPick(o.value)} />
               ))}
             </div>
           </motion.div>
@@ -326,7 +352,7 @@ function ResultItem({ f }: { f: Finding }) {
   return (
     <motion.div layoutId={`r-${f.id}`} layout transition={{ type: 'spring', stiffness: 260, damping: 30 }}
       className={cn('relative z-20 rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[0_1px_2px_rgba(11,28,48,.05)]')}>
-      <div className="text-[13.5px] font-semibold leading-snug text-ink">{f.title}</div>
+      <motion.div layout="position" className="text-[13.5px] font-semibold leading-snug text-ink">{f.title}</motion.div>
       {f.tag && <div className={cn('mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', look.cls)}><look.icon className="size-3" />{f.tag === 'exemption' ? 'School exemption' : 'Media Safe'}</div>}
       {f.bucket !== 'covered' && (
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }} className="mt-1 text-[12.5px] leading-snug text-ink-2">{f.detail}</motion.p>
@@ -404,7 +430,7 @@ function Results({ answers, onReview, onRestart }: { answers: Answers; onReview:
                     <motion.div key={f.id} layoutId={`r-${f.id}`} layout
                       className="absolute rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[0_6px_18px_rgba(11,28,48,.08)]"
                       style={{ top: depth * 9, left: depth * 12, right: depth * 12, zIndex: 10 - depth, opacity: depth > 2 ? 0 : 1 - depth * 0.18 }}>
-                      <div className="truncate text-[13.5px] font-semibold text-ink">{f.title}</div>
+                      <motion.div layout="position" className="truncate text-[13.5px] font-semibold text-ink">{f.title}</motion.div>
                     </motion.div>
                   ))}
                 </div>

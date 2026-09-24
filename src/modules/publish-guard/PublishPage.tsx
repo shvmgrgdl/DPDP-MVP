@@ -14,7 +14,7 @@ import { evaluateAsset, type AssetEval } from '@/engine/permission'
 import { useApp } from '@/store/app'
 import { useCan, useCtx } from '@/store/hooks'
 import { cn, fmtDate } from '@/lib/utils'
-import { CountUp, DEST_GROUPS, DEST_INFO, DestIcon, childLabel, firstName, fmtBytes, isDest, purposeLabel, reviewLink } from './shared'
+import { CountUp, DEST_GROUPS, DEST_INFO, DestIcon, REVIEW_LINK, childLabel, firstName, fmtBytes, isDest, photoLink, purposeLabel } from './shared'
 import { EXPORT_BLUR, exportSafeSet, type SafeSetResult } from './export'
 
 const EMPTY: MediaAsset[] = []
@@ -217,7 +217,7 @@ export default function PublishPage() {
                     <Column index={2} tone="risk" icon={<Lock className="size-4" />} title="Held back" count={held.length}
                       blurb="Not included in the export. Each one says why."
                       empty={<ColumnEmpty icon={<Check className="size-4" />} text="Nothing held back. Every photo can go." />}>
-                      <HeldList items={held} canNames={canNames} />
+                      <HeldList items={held} dest={dest} canNames={canNames} />
                     </Column>
                   </div>
                 )}
@@ -395,7 +395,7 @@ function useLimited<T>(items: T[]) {
   const [all, setAll] = React.useState(false)
   const shown = all ? items : items.slice(0, COLUMN_LIMIT)
   const more = items.length - shown.length
-  const toggle = more > 0 || all ? (
+  const toggle = items.length > COLUMN_LIMIT ? (
     <button type="button" onClick={() => setAll((v) => !v)} className="mt-2 w-full rounded-lg py-1.5 text-[12.5px] font-semibold text-azure hover:bg-surface/70">
       {all ? 'Show fewer' : `Show ${more} more`}
     </button>
@@ -455,19 +455,19 @@ function FixedThumb({ e, dest, canNames, live }: { e: AssetEval; dest: Destinati
   )
 }
 
-function HeldList({ items, canNames }: { items: AssetEval[]; canNames: boolean }) {
+function HeldList({ items, dest, canNames }: { items: AssetEval[]; dest: DestinationKey; canNames: boolean }) {
   const { shown, toggle } = useLimited(items)
   return (
     <div>
       <div className="space-y-2">
-        {shown.map((e) => <HeldRow key={e.asset.id} e={e} canNames={canNames} />)}
+        {shown.map((e) => <HeldRow key={e.asset.id} e={e} dest={dest} canNames={canNames} />)}
       </div>
       {toggle}
     </div>
   )
 }
 
-function HeldRow({ e, canNames }: { e: AssetEval; canNames: boolean }) {
+function HeldRow({ e, dest, canNames }: { e: AssetEval; dest: DestinationKey; canNames: boolean }) {
   const blocked = e.faces.filter((f) => f.state === 'blocked')
   const detail = e.verdict === 'keep-private'
     ? [...blocked.filter((f) => f.face.main), ...blocked.filter((f) => !f.face.main)].slice(0, 2).map((f) => ({ id: f.face.id, who: childLabel(f.student, canNames), why: f.reason }))
@@ -485,7 +485,8 @@ function HeldRow({ e, canNames }: { e: AssetEval; canNames: boolean }) {
           <p key={x.id} className="mt-0.5 text-[11.5px] leading-snug text-ink-3"><span className="font-semibold text-ink-2">{x.who}:</span> {x.why}</p>
         ))}
         {extra > 0 && <p className="mt-0.5 text-[11.5px] text-ink-3">and {extra} more</p>}
-        <Link to={reviewLink(e.asset.id)} className="mt-1 inline-flex items-center gap-1 text-[12px] font-semibold text-azure hover:underline">
+        <Link to={e.verdict === 'check-faces' ? REVIEW_LINK : photoLink(e.asset.id, dest)}
+          className="mt-1 inline-flex items-center gap-1 text-[12px] font-semibold text-azure hover:underline">
           Check faces <ArrowRight className="size-3" />
         </Link>
       </div>

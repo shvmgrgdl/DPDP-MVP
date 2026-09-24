@@ -473,7 +473,11 @@ async function main() {
   page.on('pageerror', (e) => console.error('[page error]', e.message))
 
   try {
-    await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+    // Anchor on a real static file (served as-is by Vite) rather than the app's index page:
+    // the app route loads the Vite/React HMR client, which can force an unrelated full-page
+    // reload mid-run (dependency re-optimization, src/ edits from other agents) and kill a
+    // long detection pass. A static asset under public/ bypasses the SPA/HMR pipeline entirely.
+    await page.goto(`${BASE}/models/face-api/ssd_mobilenetv1_model-weights_manifest.json`, { waitUntil: 'domcontentloaded' })
     await page.addScriptTag({ path: path.join(ROOT, 'node_modules/@vladmandic/face-api/dist/face-api.js') })
     console.log('Loading face-api models...')
     await loadModels(page)
