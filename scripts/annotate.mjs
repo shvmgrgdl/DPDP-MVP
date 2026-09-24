@@ -51,7 +51,7 @@ const MIN_FACE_WIDTH_FRAC = 0.022 // faces narrower than this (fraction of image
 // group photo scored up to 33.4). 25 clears every visually-verified child in the sampled photos
 // while still catching a clearly-adult face; there's no clean threshold that catches every motion
 // outlier without also swallowing genuine adults, so this is the practical balance.
-const ADULT_AGE = 25
+const ADULT_AGE = 30
 const MAIN_AREA_RATIO = 1.6 // largest face must be >= this x the runner-up to be "main"
 const CLUSTER_DIST = 0.5 // euclidean descriptor distance for "same person" (face-api same-person is typically < 0.55)
 const HOLD_BACK_COUNT = 4
@@ -558,6 +558,7 @@ async function main() {
           const out = { box: [round4(f.x / e.w), round4(f.y / e.h), round4(f.w / e.w), round4(f.h / e.h)], person: f.person, score: round4(f.score) }
           if (f.main) out.main = true
           if (f.adult) out.adult = true
+          out.g = f.gender === 'female' ? 'F' : 'M'
           return out
         }),
       }

@@ -39,7 +39,7 @@ export function FaceCrop({ asset, face, size = 96, zoom = 1.9, className }: { as
   const y0 = Math.min(Math.max((y + h / 2) * H - s / 2, 0), H - s)
   return (
     <div className={cn('relative shrink-0 overflow-hidden rounded-2xl bg-sunken', className)} style={{ width: size, height: size }}>
-      <img src={asset.src} alt="" loading="lazy" draggable={false} className="absolute max-w-none"
+      <img src={asset.src} alt="" draggable={false} className="absolute max-w-none"
         style={{ width: `${(W / s) * 100}%`, left: `${(-x0 / s) * 100}%`, top: `${(-y0 / s) * 100}%` }} />
     </div>
   )

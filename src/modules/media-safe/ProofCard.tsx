@@ -109,10 +109,10 @@ export function ProofCard() {
   return (
     <div>
       <Crumbs items={[{ label: 'Media Safe', to: '/media' }, ...(ev ? [{ label: ev.name, to: `/media/events/${ev.id}${qs}` }] : []), { label }]} />
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <div className="label-caps mb-1.5">Proof card</div>
-          <h1 className="font-display text-[28px] font-semibold leading-tight text-ink">{label}</h1>
+          <h1 className="font-display text-[24px] font-semibold leading-tight text-ink">{label}</h1>
           <p className="mt-1 text-sm text-ink-2">{ev?.name ?? 'Event'} · {fmtDateTime(asset.capturedAt)} · uploaded by {personName(asset.uploadedBy)}</p>
         </div>
         {siblings.length > 1 && (
@@ -124,21 +124,21 @@ export function ProofCard() {
         )}
       </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div>
-          <Card className="p-4 sm:p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <Card className="p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <DestSwitch value={dest} onChange={setDest} />
               <label className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-ink-2">
                 <Switch checked={blur} onCheckedChange={setBlur} label="Show blur" /> Show blur
               </label>
             </div>
-            <div className="mb-4 rounded-xl border border-line bg-[#fbfaf7] p-3.5">
+            <div className="mb-3 rounded-xl border border-line bg-[#fbfaf7] p-3">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <VerdictChip verdict={e.verdict} />
                 <span className="text-sm text-ink-2">{e.verdict === 'keep-private' && DEST[dest].note && !e.faces.some((f) => f.state === 'blocked' && f.face.main) ? DEST[dest].note : e.reason}</span>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-2.5 flex flex-wrap gap-2 [&_button]:h-9 [&_a]:h-9">
                 {!scope && (e.verdict === 'check-faces'
                   ? <Button icon={<UserRoundSearch className="size-4" />} to="/media/review">Check faces first</Button>
                   : canShare
@@ -147,7 +147,7 @@ export function ProofCard() {
                 <Button variant="secondary" icon={<Lock className="size-4" />} onClick={keepPrivate} disabled={!!kept}>{kept ? 'Kept private' : 'Keep private'}</Button>
                 <Button variant="secondary" icon={<WhatsappIcon className="size-4" />} onClick={askParent} disabled={!tGuardian || asked}>{asked ? 'Parent asked' : 'Ask parent'}</Button>
               </div>
-              <p className="mt-2.5 text-[13px] text-ink-3">
+              <p className="mt-2 text-[12px] text-ink-3">
                 {kept ? <>Kept private for {destLabel} on {fmtDate(kept.at)} by {personName(kept.actor)} · <EvidenceLink id={kept.id} /></>
                   : tStudent && tGuardian ? (asked ? `Waiting for ${tGuardian.name} to reply on WhatsApp.` : `Ask parent sends ${tGuardian.name} (${firstName(tStudent.name)}’s ${tGuardian.relation.toLowerCase()}) a one-tap request for this photo.`)
                     : e.faces.some((f) => f.state === 'unknown') ? 'Check the unknown face first — then we know whose parent to ask.'
@@ -156,7 +156,7 @@ export function ProofCard() {
                           : 'Everyone here is already cleared — no need to ask.'}
               </p>
             </div>
-            <div className="mx-auto" style={{ maxWidth: `min(100%, calc(62vh * ${(asset.w / asset.h).toFixed(3)}))` }}>
+            <div className="mx-auto" style={{ maxWidth: `min(100%, calc((100vh - 400px) * ${(asset.w / asset.h).toFixed(3)}))` }}>
               <PhotoFaces asset={asset} evals={e.faces} blurBlocked={blur} loading="eager">
                 <FaceRings asset={asset} evals={e.faces} blur={blur} selectedId={selFace?.face.id} onSelect={setSel} />
               </PhotoFaces>
@@ -165,7 +165,7 @@ export function ProofCard() {
           <p className="mt-3 flex items-center gap-2 text-xs text-ink-3"><ShieldCheck className="size-3.5 text-ok" /> Face matching is used only to enforce parents’ choices.</p>
         </div>
 
-        <Card className="p-5 xl:sticky xl:top-24">
+        <Card className="p-5 lg:sticky lg:top-20 lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto">
           <h2 className="font-display text-[20px] font-semibold text-ink">Why this decision</h2>
           <p className="mt-0.5 text-[13px] text-ink-2">Each face is checked against its own parent’s choice for {destLabel}. Tap a face to see the proof.</p>
           {e.faces.length ? (

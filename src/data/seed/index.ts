@@ -8,7 +8,7 @@ import { MEDIA_PURPOSES } from '../reference'
 import { FIRST_F, FIRST_M, HOUSES, PARENT_F, PARENT_M, SURNAMES } from './names'
 import { addDays, addHours, DEMO_NOW, pick, pub, rng, sha256 } from '@/lib/utils'
 
-export interface ManifestFace { box: [number, number, number, number]; person: string | null; score: number; main?: boolean; adult?: boolean }
+export interface ManifestFace { box: [number, number, number, number]; person: string | null; score: number; main?: boolean; adult?: boolean; g?: 'F' | 'M' }
 export interface ManifestAsset { id: string; event: string; src: string; w: number; h: number; faces: ManifestFace[]; title?: string }
 export interface ManifestVideo {
   id: string; event: string; src: string; w: number; h: number; duration: number; fps: number; title?: string
@@ -43,7 +43,7 @@ export interface AppData {
   faceIndex: Record<string, string | null>
 }
 
-export const DATA_VERSION = 10
+export const DATA_VERSION = 15
 export const pkey = (studentId: string, purpose: MediaPurposeKey) => `${studentId}|${purpose}`
 
 /** Hero students in Class 5B. Order = assignment priority onto the most frequent faces in the media manifest. */
@@ -281,26 +281,44 @@ export function createSeed(): AppData {
   // ---------- media from manifest ----------
   const m = manifest as unknown as Manifest
   const freq = new Map<string, number>()
-  for (const a of m.assets) for (const f of a.faces) if (f.person && !f.adult) freq.set(f.person, (freq.get(f.person) ?? 0) + 1)
+  const gvotes = new Map<string, number>() // >0 → mostly female
+  for (const a of m.assets) for (const f of a.faces) if (f.person && !f.adult) {
+    freq.set(f.person, (freq.get(f.person) ?? 0) + 1)
+    gvotes.set(f.person, (gvotes.get(f.person) ?? 0) + (f.g === 'F' ? 1 : f.g === 'M' ? -1 : 0))
+  }
   for (const v of m.videos) for (const t of v.tracks) if (t.person) freq.set(t.person, (freq.get(t.person) ?? 0) + 1)
   const persons = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p)
+  const genderOf = (p: string): 'F' | 'M' => ((gvotes.get(p) ?? 0) >= 0 ? 'F' : 'M')
   const personToStudent = new Map<string, string | null>()
   const pool = students.filter((s) => !s.hero && !s.protected && ['3', '4', '5', '6', '7', '8'].includes(classes.find((c) => c.id === s.classId)!.grade))
+  const poolBy = { F: pool.filter((s) => s.gender === 'F'), M: pool.filter((s) => s.gender === 'M') }
+  const poolIdxBy = { F: 0, M: 0 }
   let poolIdx = 0
+  const fromPool = (g: 'F' | 'M') => poolBy[g][(poolIdxBy[g]++ * 37) % poolBy[g].length].id
+  const heroLeft = students.filter((s) => s.hero)
   persons.forEach((p, i) => {
-    if (i < heroStudentIds.length) personToStudent.set(p, heroStudentIds[i])
+    const g = genderOf(p)
+    const hi = i < 24 ? heroLeft.findIndex((h) => h.gender === g) : -1
+    if (hi >= 0) { personToStudent.set(p, heroLeft[hi].id); heroLeft.splice(hi, 1) }
     else if ((freq.get(p) ?? 0) <= 1 && i % 6 === 5) personToStudent.set(p, null) // some one-off faces stay unknown
-    else personToStudent.set(p, pool[(poolIdx++ * 37) % pool.length].id)
+    else personToStudent.set(p, fromPool(g))
   })
+  const studentMap0 = new Map(students.map((x) => [x.id, x]))
   const assets: MediaAsset[] = []
   for (const a of m.assets) {
+    const usedHere = new Set<string>()
     const ev0 = events.find((e) => e.id === a.event) ?? events[0]
     assets.push({
       id: a.id, eventId: ev0.id, kind: 'photo', src: pub(a.src), w: a.w, h: a.h, title: a.title,
       capturedAt: addHours(ev0.date, Math.floor(r() * 3)), uploadedBy: ev0.photographerIds[0] ?? 'U-MKT',
       faces: a.faces.map((f, i) => {
         if (f.adult) return { id: `${a.id}-f${i}`, box: f.box, studentId: null, confidence: 0, review: 'non-student' as const, main: !!f.main }
-        const sidm = f.person ? personToStudent.get(f.person) ?? null : null
+        let sidm = f.person ? personToStudent.get(f.person) ?? null : null
+        // name must match the face's gender (hand-checked labels in the manifest)
+        if (sidm && f.g && studentMap0.get(sidm)?.gender !== f.g) sidm = fromPool(f.g)
+        // one child can appear only once per photo: a duplicate match becomes a different classmate
+        while (sidm && usedHere.has(sidm)) sidm = fromPool(f.g ?? 'F')
+        if (sidm) usedHere.add(sidm)
         return { id: `${a.id}-f${i}`, box: f.box, studentId: sidm, confidence: sidm ? Math.min(0.99, 0.9 + f.score * 0.09) : 0, review: sidm ? ('auto' as const) : ('unknown' as const), main: !!f.main }
       }),
     })
