@@ -4,23 +4,24 @@ import { BookOpen, Globe, Lock, Megaphone, Newspaper, Presentation } from 'lucid
 import { FacebookIcon, InstagramIcon, WhatsappIcon, YoutubeIcon } from '@/design/brand-icons'
 import { DEST, DESTINATIONS, MEDIA_PURPOSES } from '@/data/reference'
 import type { Destination, DestinationKey, Student } from '@/data/types'
+import type { FaceEval } from '@/engine/permission'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/store/app'
 import { ROLE } from '@/roles/roles'
 
 /* ------------------------------------------------------------------ destinations */
 
-export const DEST_INFO: Record<DestinationKey, { meaning: string; audience: string }> = {
-  instagram: { meaning: 'The school’s public Instagram account', audience: 'Anyone online can see, save and reshare' },
-  website: { meaning: 'News and gallery pages on the school website', audience: 'Public and found by search engines' },
-  facebook: { meaning: 'The school’s Facebook page', audience: 'Parents, alumni and the wider public' },
-  youtube: { meaning: 'Thumbnails and stills for the school channel', audience: 'Public, and stays up for years' },
-  print: { meaning: 'Admission brochure and prospectus', audience: 'Printed copies can’t be called back' },
-  newspaper: { meaning: 'Photos sent to local newspapers', audience: 'Out of the school’s hands once printed' },
-  'paid-ads': { meaning: 'Sponsored posts and admission campaigns', audience: 'Shown to strangers. The strictest rule' },
-  internal: { meaning: 'Corridor boards, yearbook and newsletters', audience: 'Students, staff and visiting parents' },
-  'class-whatsapp': { meaning: 'The class teacher’s parent group', audience: 'Parents of one class only' },
-  'private-gallery': { meaning: 'Photos inside the parent app', audience: 'Each family sees their own child' },
+export const DEST_INFO: Record<DestinationKey, { meaning: string; audience: string; phrase: string }> = {
+  instagram: { meaning: 'The school’s public Instagram account', audience: 'Anyone online can see, save and reshare', phrase: 'Instagram' },
+  website: { meaning: 'News and gallery pages on the school website', audience: 'Public and found by search engines', phrase: 'the school website' },
+  facebook: { meaning: 'The school’s Facebook page', audience: 'Parents, alumni and the wider public', phrase: 'Facebook' },
+  youtube: { meaning: 'Thumbnails and stills for the school channel', audience: 'Public, and stays up for years', phrase: 'YouTube' },
+  print: { meaning: 'Admission brochure and prospectus', audience: 'Printed copies can’t be called back', phrase: 'print' },
+  newspaper: { meaning: 'Photos sent to local newspapers', audience: 'Out of the school’s hands once printed', phrase: 'newspapers' },
+  'paid-ads': { meaning: 'Sponsored posts and admission campaigns', audience: 'Shown to strangers. The strictest rule', phrase: 'paid ads' },
+  internal: { meaning: 'Corridor boards, yearbook and newsletters', audience: 'Students, staff and visiting parents', phrase: 'notice boards and the yearbook' },
+  'class-whatsapp': { meaning: 'The class teacher’s parent group', audience: 'Parents of one class only', phrase: 'the class WhatsApp group' },
+  'private-gallery': { meaning: 'Photos inside the parent app', audience: 'Each family sees their own child', phrase: 'the private parent gallery' },
 }
 
 const GROUP_OF = (d: Destination) =>
@@ -71,6 +72,18 @@ export function classShort(classId: string) {
   if (!c) return classId
   return /^\d+$/.test(c.grade) ? c.id : `${c.grade} ${c.section}`
 }
+
+/**
+ * How a face is named in Publish Guard. Safeguarded children are never named (the reason itself would reveal a
+ * custody or court-order situation to marketing staff), matching the exported evidence pack.
+ */
+export function faceName(f: FaceEval, canNames: boolean, opts: { full?: boolean } = {}) {
+  if (f.face.review === 'non-student') return 'Adult / visitor'
+  if (!f.student) return 'Not recognised'
+  if (f.student.protected) return `Protected child · ${classShort(f.student.classId)}`
+  return childLabel(f.student, canNames, opts)
+}
+export const faceReason = (f: FaceEval) => (f.student?.protected ? 'Never published (school safeguarding rule)' : f.reason)
 
 /** "Diya · 5B" for staff who may see names, otherwise "A child in 5B". */
 export function childLabel(student: Student | undefined, canNames: boolean, opts: { full?: boolean } = {}) {

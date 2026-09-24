@@ -15,7 +15,7 @@ import { useApp } from '@/store/app'
 import { useAsset, useCan, useCtx } from '@/store/hooks'
 import { cn, fmtDate } from '@/lib/utils'
 import { BLUR_STYLES, STRENGTH, baseCanvas, canvasToJpeg, downloadBlob, fileStem, loadImage, regionNorm, renderBlurred, type BlurTarget } from './blur'
-import { DestIcon, REVIEW_LINK, actorId, classShort, isDest, photoLink } from './shared'
+import { DestIcon, REVIEW_LINK, actorId, faceName, faceReason, isDest, photoLink } from './shared'
 
 const PREVIEW_MAX = 1400
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -135,14 +135,14 @@ function Studio({ asset }: { asset: MediaAsset }) {
       c.beginPath()
       c.rect(0, 0, (p.width * split) / 100, p.height)
       c.clip()
-      c.drawImage(baseCanvas(img, PREVIEW_MAX), 0, 0)
+      c.drawImage(baseCanvas(img, PREVIEW_MAX, true), 0, 0)
       c.restore()
     }
   }
   React.useEffect(() => {
     if (!img) return
     processedRef.current = renderBlurred(img, targets, style, strength, {
-      maxSide: PREVIEW_MAX, watermark: watermark ? wmText : null, canvas: processedRef.current ?? undefined,
+      maxSide: PREVIEW_MAX, watermark: watermark ? wmText : null, canvas: processedRef.current ?? undefined, cacheBase: true,
     })
     paint()
   }, [img, targetsKey, style, strength, watermark, wmText])
@@ -200,9 +200,11 @@ function Studio({ asset }: { asset: MediaAsset }) {
   }
 
   /* ---------------- export ---------------- */
-  const blocked = !d.blurFixAllowed || uncovered.length > 0 || !canExport
+  // print, press and paid ads never use blurred faces: only a copy with nothing covered may go there
+  const noBlurHere = !d.blurFixAllowed && targets.length > 0
+  const exportBlocked = noBlurHere || uncovered.length > 0 || !canExport
   const exportJpeg = async () => {
-    if (!img || busy || blocked) return
+    if (!img || busy || exportBlocked) return
     setBusy(true)
     try {
       const full = renderBlurred(img, targets, style, strength, { watermark: watermark ? wmText : null })
@@ -231,8 +233,7 @@ function Studio({ asset }: { asset: MediaAsset }) {
   }
 
   const back = `/publish?event=${encodeURIComponent(asset.eventId)}&dest=${dest}`
-  const nameOf = (f: FaceEval, i: number) =>
-    f.face.review === 'non-student' ? 'Adult / visitor' : !f.student ? 'Not recognised' : canNames ? `${f.student.name} · ${classShort(f.student.classId)}` : `Child ${i + 1} · ${classShort(f.student.classId)}`
+  const nameOf = (f: FaceEval) => faceName(f, canNames, { full: true })
   const toggleFace = (f: FaceEval, v?: boolean) => setOverrides((o) => ({ ...o, [f.face.id]: v ?? !isBlurred(f) }))
 
   const more = React.useMemo(
@@ -255,12 +256,12 @@ function Studio({ asset }: { asset: MediaAsset }) {
                   style={{ width: fit.w, height: fit.h, touchAction: drawing ? 'none' : undefined }}>
                   <canvas ref={displayRef} className="block size-full" role="img" aria-label="Protected preview of the photo" />
 
-                  {!drawing && ev.faces.map((f, i) => {
+                  {!drawing && ev.faces.map((f) => {
                     const on = isBlurred(f)
                     return (
                       <button key={f.face.id} type="button" onClick={() => toggleFace(f)}
                         onMouseEnter={() => setHover(f.face.id)} onMouseLeave={() => setHover(null)}
-                        aria-label={`${nameOf(f, i)}: ${on ? 'blurred' : 'visible'}. Click to ${on ? 'show' : 'blur'}.`}
+                        aria-label={`${nameOf(f)}: ${on ? 'blurred' : 'visible'}. Click to ${on ? 'show' : 'blur'}.`}
                         className={cn('absolute rounded-[45%] border-2 transition-colors focus-visible:outline-none',
                           hover === f.face.id ? 'border-white/90 bg-white/5' : 'border-transparent hover:border-white/80 focus-visible:border-white')}
                         style={pctStyle(regionNorm(f.face.box))} />
@@ -337,7 +338,7 @@ function Studio({ asset }: { asset: MediaAsset }) {
               <VerdictChip verdict={ev.verdict} size="sm" className="mt-px" />
               <p className="text-[12.5px] leading-snug text-ink-2">{ev.reason}</p>
             </div>
-            {!d.blurFixAllowed && (
+            {!d.blurFixAllowed && ev.verdict !== 'ready' && (
               <p className="mt-3 flex items-start gap-2 rounded-lg bg-warn-bg px-3 py-2 text-[12.5px] text-warn">
                 <Lock className="mt-0.5 size-3.5 shrink-0" />{d.note ?? 'Blurred faces are never used here.'} Pick a public or school destination to export a blurred copy.
               </p>
@@ -382,7 +383,7 @@ function Studio({ asset }: { asset: MediaAsset }) {
               <p className="mt-3 text-[12.5px] text-ink-3">No faces were found in this photo.</p>
             ) : (
               <ul className="mt-2">
-                {ev.faces.map((f, i) => {
+                {ev.faces.map((f) => {
                   const on = isBlurred(f)
                   return (
                     <li key={f.face.id} onMouseEnter={() => setHover(f.face.id)} onMouseLeave={() => setHover(null)}
@@ -390,17 +391,17 @@ function Studio({ asset }: { asset: MediaAsset }) {
                       <FaceCrop asset={asset} box={f.face.box} blurred={on} locked={!!f.student?.protected} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate text-[13px] font-semibold text-ink">{nameOf(f, i)}</span>
+                          <span className="truncate text-[13px] font-semibold text-ink">{nameOf(f)}</span>
                           {f.face.main && <span className="shrink-0 rounded bg-sunken px-1 text-[10px] font-semibold text-ink-3">Main</span>}
                         </div>
                         <div className="mt-0.5 flex items-center gap-1.5">
                           <Chip size="sm" icon={false} tone={f.state === 'ok' ? 'ok' : f.state === 'blocked' ? 'warn' : 'info'}>
                             {f.state === 'ok' ? 'Cleared' : f.state === 'blocked' ? 'No permission' : 'Not recognised'}
                           </Chip>
-                          <span className="truncate text-[11.5px] text-ink-3" title={f.reason}>{f.reason}</span>
+                          <span className="truncate text-[11.5px] text-ink-3" title={faceReason(f)}>{faceReason(f)}</span>
                         </div>
                       </div>
-                      <Switch checked={on} onCheckedChange={(v) => toggleFace(f, v)} label={`Blur ${nameOf(f, i)}`} />
+                      <Switch checked={on} onCheckedChange={(v) => toggleFace(f, v)} label={`Blur ${nameOf(f)}`} />
                     </li>
                   )
                 })}
@@ -443,15 +444,19 @@ function Studio({ asset }: { asset: MediaAsset }) {
           </section>
 
           <section className="p-5">
-            <Button size="lg" className="w-full" onClick={exportJpeg} disabled={!img || busy || blocked}
+            <Button size="lg" className="w-full" onClick={exportJpeg} disabled={!img || busy || exportBlocked}
               icon={busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}>
               {busy ? 'Preparing JPEG…' : 'Export JPEG'}
             </Button>
-            {uncovered.length > 0 && d.blurFixAllowed && (
+            {uncovered.length > 0 && (
               <p className="mt-2.5 text-[12px] leading-snug text-warn">
-                {uncovered.length} face{uncovered.length > 1 ? 's' : ''} without permission {uncovered.length > 1 ? 'are' : 'is'} still visible. Blur {uncovered.length > 1 ? 'them' : 'it'}, or{' '}
+                {uncovered.length} face{uncovered.length > 1 ? 's' : ''} without permission {uncovered.length > 1 ? 'are' : 'is'} still visible.{' '}
+                {d.blurFixAllowed ? <>Blur {uncovered.length > 1 ? 'them' : 'it'}, or </> : <>This photo can’t go to {d.label} as it is. Pick another photo, or </>}
                 <Link to={uncovered.some((f) => f.state === 'unknown') ? REVIEW_LINK : photoLink(asset.id, dest)} className="font-semibold underline">check faces</Link> if {uncovered.length > 1 ? 'they are adults' : 'it is an adult'}.
               </p>
+            )}
+            {noBlurHere && uncovered.length === 0 && (
+              <p className="mt-2.5 text-[12px] leading-snug text-warn">Blurred copies can’t be used for {d.label}. Switch to a public or school destination, or pick a photo where everyone is cleared.</p>
             )}
             {!canExport && <p className="mt-2.5 text-[12px] text-warn">Only Marketing or the Principal can export.</p>}
             <p className="mt-2.5 flex items-center gap-1.5 text-[12px] text-ink-3"><Lock className="size-3.5" />Original stays locked in the school library</p>

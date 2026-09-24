@@ -10,7 +10,7 @@ import type { MediaAsset, Publication, Task } from '@/data/types'
 import { decisionTrace, evaluateAsset, type EngineCtx } from '@/engine/permission'
 import { personName, useApp } from '@/store/app'
 import { useCan, useCtx } from '@/store/hooks'
-import { cn, fmtDate, fmtDateTime, relDays } from '@/lib/utils'
+import { cn, fmtDate, relDays } from '@/lib/utils'
 import { DestIcon, firstName, purposeLabel } from './shared'
 
 type Filter = 'all' | Publication['status']
@@ -40,6 +40,14 @@ function takedownReason(ctx: EngineCtx, pub: Publication, asset: MediaAsset | un
 
 const pubIdIn = (t: Task) => /PUB-\d+/.exec(t.title)?.[0]
 
+function dueSentence(task?: Task) {
+  if (!task) return 'This post must come down.'
+  const r = relDays(task.dueAt, new Date().toISOString())
+  if (r === 'today' || r === 'tomorrow') return `This post must come down ${r}.`
+  if (r.startsWith('in ')) return `This post must come down within ${r.slice(3)}.`
+  return `This takedown is overdue (it was due ${fmtDate(task.dueAt)}).`
+}
+
 export default function LivePosts() {
   const pubs = useApp((s) => s.publications)
   const assets = useApp((s) => s.assets)
@@ -62,7 +70,7 @@ export default function LivePosts() {
     [pubs, filter],
   )
 
-  const takeDown = (pub: Publication) => {
+  const takeDown = (pub: Publication, quiet = false) => {
     const st = useApp.getState()
     st.requestTakedown(pub.id)
     st.tasks.filter((t) => t.kind === 'takedown' && t.status === 'open' && pubIdIn(t) === pub.id).forEach((t) => useApp.getState().completeTask(t.id))
@@ -70,11 +78,23 @@ export default function LivePosts() {
     const evId = [...ev].reverse().find((e) => e.refs.includes(pub.id) && e.title.includes('taken down'))?.id
     setFlash(pub.id)
     setTimeout(() => setFlash((f) => (f === pub.id ? null : f)), 2400)
+    if (quiet) return
     toast.success(`Post ${pub.id} marked as taken down`, {
       description: evId ? `Recorded as ${evId}.` : 'Recorded in the evidence ledger.',
       action: evId ? { label: 'View', onClick: () => useApp.getState().setUI({ evidenceDrawer: evId }) } : undefined,
     })
   }
+  const flaggedPubs = pubs.filter((p) => p.status === 'takedown-requested')
+  const [confirmAll, setConfirmAll] = React.useState(false)
+  const takeDownAll = () => {
+    const n = flaggedPubs.length
+    flaggedPubs.forEach((p) => takeDown(p, true))
+    setConfirmAll(false)
+    toast.success(`${n} post${n === 1 ? '' : 's'} marked as taken down`, { description: 'Each one is recorded in the evidence ledger.' })
+  }
+  const taskByPub = React.useMemo(() => new Map(openTakedowns.map((t) => [pubIdIn(t), t] as const)), [openTakedowns])
+  const [allTasks, setAllTasks] = React.useState(false)
+  const shownTasks = allTasks ? openTakedowns : openTakedowns.slice(0, 4)
 
   return (
     <div>
@@ -94,33 +114,39 @@ export default function LivePosts() {
 
       {openTakedowns.length > 0 && (
         <Card className="mt-6 border-warn/30 p-5">
-          <div className="flex items-center gap-2 text-[15px] font-semibold text-ink">
-            <ClipboardCheck className="size-4 text-warn" /> Takedowns to action <span className="text-ink-3 num">({openTakedowns.length})</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+              <ClipboardCheck className="size-4 text-warn" /> Takedowns to action <span className="text-ink-3 num">({openTakedowns.length})</span>
+            </div>
+            {flaggedPubs.length > 1 && (
+              <Button size="sm" variant="navy" disabled={!canPublish} onClick={() => setConfirmAll(true)}>Mark all {flaggedPubs.length} as taken down</Button>
+            )}
           </div>
+          <p className="mt-1 text-[12.5px] text-ink-3">Remove each post on its channel, then mark it here. Owner and due date come from the task.</p>
           <ul className="mt-3 divide-y divide-line">
-            {openTakedowns.map((t) => {
+            {shownTasks.map((t) => {
               const pid = pubIdIn(t)
               const pub = pubs.find((p) => p.id === pid)
               const overdue = new Date(t.dueAt).getTime() < Date.now()
               return (
-                <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[14px] text-ink">{t.title}</div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[12px] text-ink-3">
-                      <Due tone={overdue ? 'risk' : 'warn'}>Due {relDays(t.dueAt, new Date().toISOString())}</Due>
-                      <span>Owner: {personName(t.ownerId)}</span>
-                      <span>Opened {fmtDateTime(t.createdAt)}</span>
-                    </div>
-                  </div>
+                <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink" title={t.title}>{t.title}</span>
+                  <Due tone={overdue ? 'risk' : 'warn'}>Due {relDays(t.dueAt, new Date().toISOString())}</Due>
+                  <span className="text-[12px] text-ink-3">{personName(t.ownerId)}</span>
                   {pub && pub.status === 'takedown-requested' ? (
-                    <Button size="sm" variant="navy" disabled={!canPublish} onClick={() => takeDown(pub)}>Mark as taken down</Button>
+                    <Button size="sm" variant="ghost" disabled={!canPublish} onClick={() => takeDown(pub)}>Mark as taken down</Button>
                   ) : (
-                    <Button size="sm" variant="secondary" onClick={() => { useApp.getState().completeTask(t.id); toast.success('Task marked done') }}>Mark task done</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { useApp.getState().completeTask(t.id); toast.success('Task marked done') }}>Mark task done</Button>
                   )}
                 </li>
               )
             })}
           </ul>
+          {openTakedowns.length > 4 && (
+            <button type="button" onClick={() => setAllTasks((v) => !v)} className="mt-1 text-[12.5px] font-semibold text-azure hover:underline">
+              {allTasks ? 'Show fewer' : `Show all ${openTakedowns.length}`}
+            </button>
+          )}
         </Card>
       )}
 
@@ -145,13 +171,24 @@ export default function LivePosts() {
           <ul className="divide-y divide-line">
             <AnimatePresence initial={false}>
               {rows.map((p) => (
-                <PostRow key={p.id} pub={p} asset={assetById.get(p.assetId)} ctx={ctx} flash={flash === p.id} canPublish={canPublish}
+                <PostRow key={p.id} pub={p} asset={assetById.get(p.assetId)} ctx={ctx} flash={flash === p.id} canPublish={canPublish} task={taskByPub.get(p.id)}
                   onTakeDown={() => (p.status === 'takedown-requested' ? takeDown(p) : setConfirm(p))} />
               ))}
             </AnimatePresence>
           </ul>
         )}
       </Card>
+
+      <Dialog open={confirmAll} onOpenChange={setConfirmAll} title={`Mark ${flaggedPubs.length} posts as taken down?`}
+        description="Only do this once the posts are removed from their channels."
+        footer={<>
+          <Button variant="secondary" onClick={() => setConfirmAll(false)}>Cancel</Button>
+          <Button variant="navy" onClick={takeDownAll}>Mark all as taken down</Button>
+        </>}>
+        <ul className="space-y-1 text-sm text-ink-2">
+          {flaggedPubs.map((p) => <li key={p.id}><span className="font-mono text-[12px]">{p.id}</span> · {DEST[p.destination].label} · {assetById.get(p.assetId)?.title ?? p.assetId}</li>)}
+        </ul>
+      </Dialog>
 
       <Dialog open={!!confirm} onOpenChange={(v) => !v && setConfirm(null)} title="Take this post down?"
         description={confirm ? `${confirm.id} on ${DEST[confirm.destination].label}, published ${fmtDate(confirm.at)}.` : undefined}
@@ -165,8 +202,8 @@ export default function LivePosts() {
   )
 }
 
-function PostRow({ pub, asset, ctx, flash, canPublish, onTakeDown }: {
-  pub: Publication; asset?: MediaAsset; ctx: EngineCtx; flash: boolean; canPublish: boolean; onTakeDown: () => void
+function PostRow({ pub, asset, ctx, flash, canPublish, task, onTakeDown }: {
+  pub: Publication; asset?: MediaAsset; ctx: EngineCtx; flash: boolean; canPublish: boolean; task?: Task; onTakeDown: () => void
 }) {
   const d = DEST[pub.destination]
   const flagged = pub.status === 'takedown-requested'
@@ -202,7 +239,7 @@ function PostRow({ pub, asset, ctx, flash, canPublish, onTakeDown }: {
               <span className="font-semibold">A parent changed their choice.</span>{' '}
               <span className="text-ink-2">
                 {reason ? <>{reason.text}{reason.at ? ` · ${relDays(reason.at, new Date().toISOString())}` : ''}{reason.others > 0 ? ` (and ${reason.others} more)` : ''}. </> : null}
-                This post must come down.
+                {dueSentence(task)}
               </span>
               {reason?.evidenceId && <> <EvidenceLink id={reason.evidenceId} className="text-[11.5px]" /></>}
             </span>

@@ -1,19 +1,14 @@
-import { Routes, Route } from 'react-router'
-import { PageHeader, Card, Empty } from '@/design/ui'
+import { Navigate, Route, Routes } from 'react-router'
+import { UploadPage } from './UploadPage'
+import { PortalPage } from './PortalPage'
 
-function Placeholder() {
-  return (
-    <div>
-      <PageHeader eyebrow="Media Safe" title="Photos & videos" />
-      <Card><Empty title="Being built" body="This module is part of the first draft build." /></Card>
-    </div>
-  )
-}
-
+/** /media/upload (staff Media X-Ray) and /media/upload/portal (photographer guest portal). */
 export default function Module() {
   return (
     <Routes>
-      <Route path="*" element={<Placeholder />} />
+      <Route index element={<UploadPage />} />
+      <Route path="portal" element={<PortalPage />} />
+      <Route path="*" element={<Navigate to="/media/upload" replace />} />
     </Routes>
   )
 }

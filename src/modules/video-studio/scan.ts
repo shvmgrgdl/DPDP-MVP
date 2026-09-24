@@ -32,6 +32,8 @@ export function cancelScan(id: string) {
   if (ctl) ctl.cancelled = true
 }
 
+type Sampler = (t: number, frame: HTMLCanvasElement) => Promise<void>
+
 async function runScan(entry: VideoEntry, ctl: Ctl) {
   const t0 = performance.now()
   patchScan(entry.id, { status: 'starting', progress: 0, tracks: [], samples: 0, error: undefined })
@@ -48,11 +50,6 @@ async function runScan(entry: VideoEntry, ctl: Ctl) {
     const k = Math.min(1, ANALYSIS_EDGE / Math.max(video.videoWidth, video.videoHeight))
     const cw = Math.max(2, Math.round(video.videoWidth * k))
     const ch = Math.max(2, Math.round(video.videoHeight * k))
-    const canvas = document.createElement('canvas')
-    canvas.width = cw
-    canvas.height = ch
-    const g = canvas.getContext('2d')
-    if (!g) throw new Error('Canvas is not available in this browser')
     const tracker = new IouTracker()
     let samples = 0
 
@@ -61,15 +58,14 @@ async function runScan(entry: VideoEntry, ctl: Ctl) {
       patchScan(entry.id, { tracks: list.map(toLive), samples })
     }
 
-    const sample = async (t: number) => {
-      g.drawImage(video, 0, 0, cw, ch)
+    const sample: Sampler = async (t, frame) => {
       const needId = tracker.tracks.filter((tr) => tracker.needsIdentity(tr, cw, ch))
       // The quick detector keeps up with motion; the thorough one (with face descriptors) runs about once a
       // second to catch small faces, and whenever a new face still needs a name.
       const thorough = samples % SAMPLE_FPS === 0 || needId.length > 0
       const dets = thorough
-        ? await detectFaces(canvas, { detector: 'ssd', descriptors: true, tiles: false, minConfidence: 0.4 })
-        : await detectFaces(canvas, { detector: 'tiny', inputSize: 512, minConfidence: 0.45 })
+        ? await detectFaces(frame, { detector: 'ssd', descriptors: true, tiles: false, minConfidence: 0.4 })
+        : await detectFaces(frame, { detector: 'tiny', inputSize: 512, minConfidence: 0.45 })
       if (ctl.cancelled) return
       const res = tracker.update(t, dets)
       const voted = new Set<TrackState>()
@@ -78,7 +74,7 @@ async function runScan(entry: VideoEntry, ctl: Ctl) {
           tracker.vote(r.track, await matchDescriptor(r.det.descriptor))
           voted.add(r.track)
         }
-        takeThumb(r.track, r.det.box, canvas)
+        takeThumb(r.track, r.det.box, frame)
       }
       // a thorough pass that didn't see a waiting face still counts as a try, so we never loop on it
       if (thorough) for (const tr of needId) if (!voted.has(tr)) tracker.vote(tr, null)
@@ -86,7 +82,7 @@ async function runScan(entry: VideoEntry, ctl: Ctl) {
       if (samples % 3 === 0) publish(false)
     }
 
-    await drive(video, duration, sample, ctl, (t) => patchScan(entry.id, { progress: Math.min(0.99, t / duration), samples }))
+    await drive(video, duration, cw, ch, sample, ctl, (t) => patchScan(entry.id, { progress: Math.min(0.99, t / duration), samples }), info.backend)
     if (ctl.cancelled) return
     publish(true)
     patchScan(entry.id, { status: 'done', progress: 1, ms: Math.round(performance.now() - t0) })
@@ -126,67 +122,91 @@ function takeThumb(tr: TrackState, box: Box, src: HTMLCanvasElement) {
 }
 
 /**
- * Walk through the video once. Primary mode plays the hidden video and pauses on each sample frame
- * (requestVideoFrameCallback gives the exact frame time), so decoding stays sequential and no sample is skipped
- * however slow the detector is. If frame callbacks are missing or stall (e.g. a background tab), fall back to seeking.
+ * Walk through the video once, sampling ~7 frames per second of video.
+ *
+ * Fast path: the video never stops. requestVideoFrameCallback hands us each presented frame with its exact media
+ * time; at each sample point the frame is copied into a canvas and playback drops to 1/16 speed while the detector
+ * works (the detector can block the main thread; a crawling video can't run past the next sample point, and unlike
+ * pause/play it causes no dropped "late" frames on resume). Then it runs at 2x to the next sample point.
+ *
+ * Slow path: without frame callbacks, on a CPU-only engine, or if the detector is so slow that the crawl still
+ * overshoots, the rest is sampled by seeking frame by frame.
  */
-async function drive(video: HTMLVideoElement, duration: number, sample: (t: number) => Promise<void>, ctl: Ctl, onProgress: (t: number) => void) {
+async function drive(video: HTMLVideoElement, duration: number, cw: number, ch: number, sample: Sampler, ctl: Ctl, onProgress: (t: number) => void, backend: string) {
   const step = 1 / SAMPLE_FPS
+  const frame = document.createElement('canvas')
+  frame.width = cw
+  frame.height = ch
+  const g = frame.getContext('2d')
+  if (!g) throw new Error('Canvas is not available in this browser')
   let nextT = 0
-  if (typeof video.requestVideoFrameCallback === 'function') {
-    const completed = await new Promise<boolean>((resolve, reject) => {
-      let busy = false
-      let settled = false
-      let endedFlag = false
-      let lastCb = performance.now()
-      const finish = (v: boolean) => {
-        if (settled) return
-        settled = true
-        window.clearInterval(watch)
-        video.removeEventListener('ended', onEnded)
-        video.pause()
-        resolve(v)
+
+  if (typeof video.requestVideoFrameCallback === 'function' && backend !== 'cpu') {
+    const SLOW = 0.0625
+    const FAST = 2
+    const setRate = (r: number) => { try { if (video.playbackRate !== r) video.playbackRate = r } catch { /* rate not supported */ } }
+    let pending: number | null = null
+    let wake: (() => void) | null = null
+    const signal = () => { const w = wake; wake = null; w?.() }
+    let ended = false
+    let stalled = false
+    let overshoots = 0
+    let jobs = 0
+    let lastCb = performance.now()
+
+    const cb = (_now: number, meta: VideoFrameCallbackMetadata) => {
+      if (ended || stalled || ctl.cancelled) return
+      lastCb = performance.now()
+      const t = meta.mediaTime
+      if (pending === null && t + 1e-3 >= nextT) {
+        setRate(SLOW)
+        g.drawImage(video, 0, 0, cw, ch)
+        pending = t
+        signal()
       }
-      const fail = (e: unknown) => {
-        if (settled) return
-        settled = true
-        window.clearInterval(watch)
-        video.removeEventListener('ended', onEnded)
-        reject(e)
-      }
-      const onEnded = () => { if (busy) endedFlag = true; else finish(true) }
-      const cb = (_now: number, meta: VideoFrameCallbackMetadata) => {
-        if (settled) return
-        lastCb = performance.now()
-        if (ctl.cancelled) return finish(true)
-        const t = meta.mediaTime
-        if (t + 1e-3 < nextT) { video.requestVideoFrameCallback(cb); return }
-        busy = true
-        video.pause()
-        sample(t).then(() => {
-          busy = false
-          nextT = t + step
-          onProgress(t)
-          lastCb = performance.now()
-          if (settled) return
-          if (ctl.cancelled || endedFlag || video.ended || t >= duration - 1e-3) return finish(true)
-          video.requestVideoFrameCallback(cb)
-          video.play().catch(() => finish(false))
-        }, fail)
-      }
-      const watch = window.setInterval(() => {
-        if (!busy && !settled && performance.now() - lastCb > 4000) finish(false)
-      }, 1000)
-      video.addEventListener('ended', onEnded)
-      video.playbackRate = 2
       video.requestVideoFrameCallback(cb)
-      video.play().catch(() => finish(false))
-    })
-    if (completed || ctl.cancelled) return
+    }
+    const onEnded = () => { ended = true; signal() }
+    video.addEventListener('ended', onEnded)
+    const watch = window.setInterval(() => {
+      if (!ended && !stalled && pending === null && performance.now() - lastCb > 4000) { stalled = true; signal() }
+    }, 1000)
+
+    setRate(FAST)
+    video.requestVideoFrameCallback(cb)
+    video.play().catch(() => { stalled = true; signal() })
+    try {
+      for (;;) {
+        if (ctl.cancelled) break
+        if (pending === null) {
+          if (ended || stalled) break
+          await new Promise<void>((r) => { wake = r })
+          continue
+        }
+        const t = pending
+        await sample(t, frame)
+        onProgress(t)
+        nextT = t + step
+        jobs++
+        // crawled past the next sample point anyway? (very slow detector) → finish by seeking instead
+        if (!ended && video.currentTime > nextT + step * 0.5 && jobs > 2 && ++overshoots >= 2) { stalled = true; break }
+        pending = null
+        lastCb = performance.now()
+        if (!ended) setRate(FAST)
+      }
+    } finally {
+      window.clearInterval(watch)
+      video.removeEventListener('ended', onEnded)
+      video.pause()
+    }
+    if (ctl.cancelled || (ended && !stalled)) return
   }
+
+  // Seek-by-seek sampling (deterministic, a little slower).
   for (let t = nextT; t < duration && !ctl.cancelled; t += step) {
     await seekExact(video, Math.min(t, Math.max(0, duration - 0.01)))
-    await sample(t)
+    g.drawImage(video, 0, 0, cw, ch)
+    await sample(t, frame)
     onProgress(t)
   }
 }

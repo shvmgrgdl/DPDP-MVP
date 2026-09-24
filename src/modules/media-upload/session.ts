@@ -40,6 +40,8 @@ export interface XItem {
   w: number
   h: number
   faces: XFace[]
+  /** detection finished (faces may be empty) */
+  detected?: boolean
   /** match results have landed (rings switch from "found" to named / unknown) */
   matched?: boolean
   assetId?: string
@@ -60,6 +62,8 @@ export interface SessionState {
   clear: (eventId: string) => void
   focus: (key: string | null) => void
   retry: () => void
+  /** Stop photos that have not started yet (e.g. the upload link was closed). */
+  cancelQueued: (reason: string) => void
 }
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i
@@ -125,6 +129,10 @@ function makeSession(mode: Mode) {
       set({ items: keep, focusKey: null })
     },
     focus: (key) => set({ focusKey: key }),
+    cancelQueued: (reason) => {
+      if (!get().items.some((i) => i.phase === 'queued')) return
+      set({ items: get().items.map((i) => (i.phase === 'queued' ? { ...i, phase: 'error', error: reason } : i)) })
+    },
     retry: () => {
       set({ items: get().items.map((i) => (i.phase === 'error' && files.has(i.key) ? { ...i, phase: 'queued', error: undefined, engineError: undefined } : i)) })
       void pump()
@@ -208,7 +216,7 @@ function makeSession(mode: Mode) {
       const faces: XFace[] = detected.map((d, i) => ({
         id: `f${i}`, box: d.box, score: d.score, personId: null, studentId: null, distance: null, confidence: 0, main: i === 0, crop: cropFace(img.canvas, d.box),
       }))
-      patch(item.key, { faces })
+      patch(item.key, { faces, detected: true })
       await minStep
       await pace(500 + Math.min(faces.length, 12) * 80)
 

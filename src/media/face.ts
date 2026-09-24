@@ -7,7 +7,7 @@
  * STABLE API
  *   loadModels(): Promise<FaceEngineInfo>
  *       Idempotent. SSD MobileNet v1 + 68-point landmarks + 128-d recognition from /models/face-api/,
- *       TF.js backend webgl → wasm → software webgl → cpu, then a warm-up. Progress is published on useFaceEngine.
+ *       TF.js backend webgl → software webgl → wasm → cpu, then a warm-up. Progress is published on useFaceEngine.
  *   useFaceEngine: zustand hook → { status: 'idle'|'loading'|'ready'|'error', progress 0..1, stage, backend, error? }
  *   modelsReady(): boolean · getBackend(): string | null
  *   detectFaces(input: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, opts?) → Promise<DetectedFace[]>
@@ -172,19 +172,19 @@ async function tryBackend(tf: TfRuntime, name: string): Promise<boolean> {
   }
 }
 
-/** GPU WebGL first; WASM (from CDN, only if reachable); software WebGL; plain CPU last. */
+/** GPU WebGL first; software WebGL; WASM (from CDN, only if reachable); plain CPU last. */
 async function initBackend(fa: FaceApi): Promise<string> {
   const tf = fa.tf as unknown as TfRuntime
   const gl = webglSupport()
   if (gl === 'hw' && (await tryBackend(tf, 'webgl'))) return 'webgl'
-  if (tf.setWasmPaths && tf.findBackendFactory('wasm') && (await reachable(`${WASM_CDN}tfjs-backend-wasm-simd.wasm`))) {
-    tf.setWasmPaths(WASM_CDN)
-    if (await tryBackend(tf, 'wasm')) return 'wasm'
-  }
   if (gl === 'sw') {
     // must be set before TF.js first probes WebGL (it caches the result)
     try { tf.env().set('SOFTWARE_WEBGL_ENABLED', true) } catch { /* older tfjs */ }
     if (await tryBackend(tf, 'webgl')) return 'webgl'
+  }
+  if (tf.setWasmPaths && tf.findBackendFactory('wasm') && (await reachable(`${WASM_CDN}tfjs-backend-wasm-simd.wasm`))) {
+    tf.setWasmPaths(WASM_CDN)
+    if (await tryBackend(tf, 'wasm')) return 'wasm'
   }
   if (await tryBackend(tf, 'cpu')) return 'cpu'
   throw new Error('No TensorFlow.js backend is available in this browser')

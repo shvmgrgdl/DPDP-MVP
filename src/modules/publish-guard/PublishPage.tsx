@@ -14,14 +14,14 @@ import { evaluateAsset, type AssetEval } from '@/engine/permission'
 import { useApp } from '@/store/app'
 import { useCan, useCtx } from '@/store/hooks'
 import { cn, fmtDate } from '@/lib/utils'
-import { CountUp, DEST_GROUPS, DEST_INFO, DestIcon, REVIEW_LINK, childLabel, firstName, fmtBytes, isDest, photoLink, purposeLabel } from './shared'
+import { CountUp, DEST_GROUPS, DEST_INFO, DestIcon, REVIEW_LINK, faceName, faceReason, firstName, fmtBytes, isDest, photoLink, purposeLabel } from './shared'
 import { EXPORT_BLUR, exportSafeSet, type SafeSetResult } from './export'
 
 const EMPTY: MediaAsset[] = []
 const COLUMN_LIMIT = 12
 const spring = { type: 'spring', stiffness: 380, damping: 36, mass: 0.9 } as const
 
-type ExportDone = SafeSetResult & { dest: DestinationKey; eventName: string; preview: AssetEval[] }
+type ExportDone = SafeSetResult & { dest: DestinationKey; eventId: string; eventName: string; preview: AssetEval[] }
 
 export default function PublishPage() {
   const [params, setParams] = useSearchParams()
@@ -32,6 +32,7 @@ export default function PublishPage() {
   const canPublish = useCan('publish')
   const canNames = useCan('view-names')
   const reduce = useReducedMotion()
+  const storyMode = useApp((s) => s.storyStep !== null) // the presenter's story bar sits at the bottom of the screen
 
   const photosByEvent = React.useMemo(() => {
     const m = new Map<string, MediaAsset[]>()
@@ -54,6 +55,7 @@ export default function PublishPage() {
   const [blurUnknowns, setBlurUnknowns] = React.useState(false)
   const unknownsBlurred = blurUnknowns && d.blurFixAllowed
   const photos = photosByEvent.get(eventId) ?? EMPTY
+  const videoCount = React.useMemo(() => assets.filter((a) => a.kind === 'video' && a.eventId === eventId).length, [assets, eventId])
 
   const evals = React.useMemo(() => photos.map((a) => evaluateAsset(ctx, a, dest, { blurUnknowns: unknownsBlurred })), [photos, ctx, dest, unknownsBlurred])
   const ready = evals.filter((e) => e.verdict === 'ready')
@@ -112,7 +114,8 @@ export default function PublishPage() {
         event, eventId, dest, ready, fixed, held, blurUnknowns: unknownsBlurred, ctx,
         onProgress: (n, total) => setProgress({ done: n, total }),
       })
-      setDone({ ...res, dest, eventName: event?.name ?? eventId, preview: [...fixed, ...ready].slice(0, 6) })
+      const left = new Set(res.skipped.map((x) => x.assetId))
+      setDone({ ...res, dest, eventId, eventName: event?.name ?? eventId, preview: [...fixed, ...ready].filter((e) => !left.has(e.asset.id)).slice(0, 6) })
       setDialogOpen(true)
     } catch (err) {
       toast.error('The export didn’t finish', { description: err instanceof Error ? err.message : String(err) })
@@ -142,8 +145,13 @@ export default function PublishPage() {
           <div className="xl:hidden"><DestinationChips value={dest} onChange={(k) => setQuery({ dest: k })} canGo={canGo} total={photos.length} /></div>
         </aside>
 
-        <section className="min-w-0" aria-live="polite">
-          {done && !dialogOpen && done.dest === dest && (
+        <section className="min-w-0">
+          {photos.length > 0 && !scanning && (
+            <p className="sr-only" aria-live="polite">
+              {`${d.label}: ${ready.length} ready to share, ${fixed.length} fixed with blur, ${held.length} held back.`}
+            </p>
+          )}
+          {done && !dialogOpen && done.dest === dest && done.eventId === eventId && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
               className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-ok/20 bg-ok-bg px-4 py-3 text-[13.5px] text-ok">
               <CircleCheck className="size-4 shrink-0" />
@@ -206,14 +214,14 @@ export default function PublishPage() {
                 ) : (
                   <div className="grid items-start gap-4 p-4 md:grid-cols-3 md:p-5">
                     <Column index={0} tone="ok" icon={<CircleCheck className="size-4" />} title="Ready to share" count={ready.length}
-                      blurb={`Everyone in these photos is cleared for ${d.short === 'Print' ? 'print' : d.label}.`}
-                      empty={<ColumnEmpty icon={<Info className="size-4" />} text={`No photo is cleared as taken for ${d.label}.`} />}>
+                      blurb={`Everyone in these photos is cleared for ${DEST_INFO[dest].phrase}.`}
+                      empty={<ColumnEmpty icon={<Info className="size-4" />} text={`No photo is cleared as taken for ${DEST_INFO[dest].phrase}.`} />}>
                       <ThumbGrid items={ready} render={(e) => <ReadyThumb key={e.asset.id} e={e} live={liveHere.has(e.asset.id)} />} />
                     </Column>
                     <Column index={1} tone="warn" icon={<EyeOff className="size-4" />} title="Fixed with blur" count={fixed.length}
                       blurb="Children without permission are blurred in the copy that leaves school."
                       empty={<ColumnEmpty icon={d.blurFixAllowed ? <Check className="size-4" /> : <Lock className="size-4" />}
-                        text={d.blurFixAllowed ? 'No photo needs a blur.' : `Blur is never used for ${d.label}.`} />}>
+                        text={d.blurFixAllowed ? 'No photo needs a blur.' : `Blur is never used for ${DEST_INFO[dest].phrase}.`} />}>
                       <ThumbGrid items={fixed} render={(e) => <FixedThumb key={e.asset.id} e={e} dest={dest} canNames={canNames} live={liveHere.has(e.asset.id)} />} />
                     </Column>
                     <Column index={2} tone="risk" icon={<Lock className="size-4" />} title="Held back" count={held.length}
@@ -227,15 +235,20 @@ export default function PublishPage() {
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-[#fbfaf7] px-6 py-3 text-[12px] text-ink-3">
                 <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-3.5 text-ok" />Faces are matched to the class roster, then checked against the parent’s latest choice. Unrecognised faces are never guessed.</span>
+                {videoCount > 0 && (
+                  <Link to="/video" className="inline-flex items-center gap-1 font-semibold text-azure hover:underline">
+                    {videoCount} video{videoCount === 1 ? '' : 's'} from this event: protect in Video Studio <ArrowRight className="size-3" />
+                  </Link>
+                )}
                 <MediaCaption className="ml-auto" />
               </div>
             </Card>
           )}
 
           {photos.length > 0 && (
-            <div className="sticky bottom-4 z-20 mt-4">
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface/95 px-5 py-4 shadow-[var(--shadow-pop)] backdrop-blur">
-                <div className="min-w-0">
+            <div className={cn('sticky z-20 mt-4', storyMode ? 'bottom-[124px]' : 'bottom-4')}>
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface/95 px-5 py-4 shadow-[var(--shadow-pop)] backdrop-blur sm:flex-nowrap">
+                <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-semibold text-ink">
                     {exportable ? <>Safe set for {d.label}: <span className="num">{exportable}</span> photo{exportable === 1 ? '' : 's'}</> : `Nothing can go to ${d.label} yet`}
                   </div>
@@ -246,7 +259,7 @@ export default function PublishPage() {
                     {!canPublish && <span className="block text-warn">Only Marketing or the Principal can export.</span>}
                   </div>
                 </div>
-                <Button size="lg" onClick={onExport} disabled={!exportable || !!progress || !canPublish || scanning}
+                <Button size="lg" className="shrink-0" onClick={onExport} disabled={!exportable || !!progress || !canPublish || scanning}
                   icon={progress ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}>
                   {progress ? `Preparing ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…` : `Export safe set (${exportable})`}
                 </Button>
@@ -500,7 +513,7 @@ function HeldList({ items, dest, canNames }: { items: AssetEval[]; dest: Destina
 function HeldRow({ e, dest, canNames }: { e: AssetEval; dest: DestinationKey; canNames: boolean }) {
   const blocked = e.faces.filter((f) => f.state === 'blocked')
   const detail = e.verdict === 'keep-private'
-    ? [...blocked.filter((f) => f.face.main), ...blocked.filter((f) => !f.face.main)].slice(0, 1).map((f) => ({ id: f.face.id, who: childLabel(f.student, canNames), why: f.reason }))
+    ? [...blocked.filter((f) => f.face.main), ...blocked.filter((f) => !f.face.main)].slice(0, 1).map((f) => ({ id: f.face.id, who: faceName(f, canNames), why: faceReason(f) }))
     : []
   const extra = e.verdict === 'keep-private' ? blocked.length - detail.length : 0
   return (
@@ -545,6 +558,9 @@ function ExportDialog({ open, onOpenChange, done }: { open: boolean; onOpenChang
             <li className="flex items-start gap-2.5"><EyeOff className="mt-0.5 size-4 shrink-0 text-warn" /><span><b className="num">{done.blurred}</b> cop{done.blurred === 1 ? 'y' : 'ies'} with faces blurred into the pixels ({EXPORT_BLUR.label.toLowerCase()}, full resolution)</span></li>
             <li className="flex items-start gap-2.5"><FileCheck2 className="mt-0.5 size-4 shrink-0 text-azure" /><span><Mono>evidence.json</Mono> and a readable <Mono>evidence.html</Mono>: every face, its parent choice and notice version</span></li>
             {done.heldBack > 0 && <li className="flex items-start gap-2.5"><Lock className="mt-0.5 size-4 shrink-0 text-risk" /><span><b className="num">{done.heldBack}</b> held back and not included</span></li>}
+            {done.skipped.length > 0 && (
+              <li className="flex items-start gap-2.5"><Info className="mt-0.5 size-4 shrink-0 text-ink-3" /><span><b className="num">{done.skipped.length}</b> photo{done.skipped.length === 1 ? '' : 's'} couldn’t be read and {done.skipped.length === 1 ? 'was' : 'were'} left out (listed in the evidence pack)</span></li>
+            )}
           </ul>
           <dl className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-xl border border-line bg-sunken/60 p-4 text-[13px]">
             <dt className="text-ink-3">Evidence record</dt><dd><EvidenceLink id={done.evidenceId} /></dd>

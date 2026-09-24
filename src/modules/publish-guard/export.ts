@@ -31,6 +31,8 @@ export interface SafeSetInput {
 }
 
 export interface SafeSetResult {
+  /** Photos that could not be read (missing or unreadable file) and were left out of the pack. */
+  skipped: { assetId: string; title: string | null; reason: string }[]
   evidenceId: string
   packEvidenceId: string
   filename: string
@@ -105,39 +107,49 @@ export async function exportSafeSet(input: SafeSetInput): Promise<SafeSetResult>
     return p
   }
   const photos: PhotoRecord[] = []
+  const skipped: SafeSetResult['skipped'] = []
+  const skip = (e: AssetEval, err: unknown) =>
+    skipped.push({ assetId: e.asset.id, title: e.asset.title ?? null, reason: err instanceof Error ? err.message : 'Could not read the photo' })
   let done = 0
   input.onProgress?.(0, total)
 
   for (const e of ready) {
     const a = e.asset
-    const file = unique(`photos/${fileStem(a.src, a.id)}.${fileExt(a.src)}`)
-    files[`${folder}/${file}`] = [await fetchBytes(a.src), { level: 0 }]
-    photos.push({ assetId: a.id, title: a.title ?? null, file, decision: 'Ready to share', variant: 'original', faces: e.faces.map((f) => faceRecord(ctx, f, dest, 'Shown')) })
+    try {
+      const bytes = await fetchBytes(a.src)
+      const file = unique(`photos/${fileStem(a.src, a.id)}.${fileExt(a.src)}`)
+      files[`${folder}/${file}`] = [bytes, { level: 0 }]
+      photos.push({ assetId: a.id, title: a.title ?? null, file, decision: 'Ready to share', variant: 'original', faces: e.faces.map((f) => faceRecord(ctx, f, dest, 'Shown')) })
+    } catch (err) {
+      skip(e, err)
+    }
     input.onProgress?.(++done, total)
   }
 
   for (const e of fixed) {
     const a = e.asset
-    const img = await loadImage(a.src)
-    const targets = e.faces.filter((f) => f.state === 'blocked').map((f) => ({ box: f.face.box, shape: 'face' as const }))
-    const canvas = renderBlurred(img, targets, EXPORT_BLUR.style, EXPORT_BLUR.strength)
-    const bytes = await blobBytes(await canvasToJpeg(canvas, 0.9))
-    canvas.width = canvas.height = 1 // release memory early
-    const file = unique(`photos/${fileStem(a.src, a.id)}-blurred.jpg`)
-    files[`${folder}/${file}`] = [bytes, { level: 0 }]
-    photos.push({
-      assetId: a.id, title: a.title ?? null, file, decision: 'Fixed with blur', variant: 'blurred',
-      faces: e.faces.map((f) => faceRecord(ctx, f, dest, f.state === 'blocked' ? 'Blurred' : 'Shown')),
-    })
+    try {
+      const img = await loadImage(a.src, false)
+      const targets = e.faces.filter((f) => f.state === 'blocked').map((f) => ({ box: f.face.box, shape: 'face' as const }))
+      const canvas = renderBlurred(img, targets, EXPORT_BLUR.style, EXPORT_BLUR.strength)
+      const bytes = await blobBytes(await canvasToJpeg(canvas, 0.9))
+      canvas.width = canvas.height = 1 // release memory early
+      const file = unique(`photos/${fileStem(a.src, a.id)}-blurred.jpg`)
+      files[`${folder}/${file}`] = [bytes, { level: 0 }]
+      photos.push({
+        assetId: a.id, title: a.title ?? null, file, decision: 'Fixed with blur', variant: 'blurred',
+        faces: e.faces.map((f) => faceRecord(ctx, f, dest, f.state === 'blocked' ? 'Blurred' : 'Shown')),
+      })
+    } catch (err) {
+      skip(e, err)
+    }
     input.onProgress?.(++done, total)
     await tick()
   }
+  if (!photos.length) throw new Error(skipped[0]?.reason ?? 'None of the photos could be read.')
 
-  // record the publication first so the pack can carry its evidence ID
-  const evidenceId = app.publish(
-    [...ready.map((e) => ({ assetId: e.asset.id, variant: 'original' as const })), ...fixed.map((e) => ({ assetId: e.asset.id, variant: 'blurred' as const }))],
-    dest,
-  )
+  // record the publication first so the pack can carry its evidence ID (only what is really in the pack)
+  const evidenceId = app.publish(photos.map((p) => ({ assetId: p.assetId, variant: p.variant })), dest)
   const actor = actorId()
   const d = DEST[dest]
   const heldBack: HeldRecord[] = held.map((e) => ({
@@ -158,13 +170,15 @@ export async function exportSafeSet(input: SafeSetInput): Promise<SafeSetResult>
     summary: {
       photosChecked: ready.length + fixed.length + held.length,
       facesChecked: [...ready, ...fixed, ...held].reduce((n, e) => n + e.faces.length, 0),
-      readyAsTaken: ready.length,
-      fixedWithBlur: fixed.length,
+      readyAsTaken: photos.filter((p) => p.variant === 'original').length,
+      fixedWithBlur: photos.filter((p) => p.variant === 'blurred').length,
       heldBack: held.length,
+      leftOutUnreadable: skipped.length,
     },
     noticeVersions: notices,
     photos,
     heldBack,
+    leftOut: skipped,
     originals: 'Unedited originals stay locked in the school library. This pack holds only what was cleared for this destination.',
     disclaimer: LEGAL.disclaimer,
   }
@@ -180,10 +194,16 @@ export async function exportSafeSet(input: SafeSetInput): Promise<SafeSetResult>
     title: `Evidence pack downloaded: ${filename}`,
     actor,
     refs: [evidenceId, ...photos.map((p) => p.assetId)],
-    payload: { file: filename, photos: total, blurred: fixed.length, 'held back': held.length, fingerprint: `${fingerprint.slice(0, 16)}…` },
+    payload: {
+      file: filename, photos: photos.length, blurred: pack.summary.fixedWithBlur, 'held back': held.length,
+      ...(skipped.length ? { 'left out (unreadable)': skipped.length } : {}), fingerprint: `${fingerprint.slice(0, 16)}…`,
+    },
   })
   downloadBlob(new Blob([zipped], { type: 'application/zip' }), filename)
-  return { evidenceId, packEvidenceId, filename, size: zipped.byteLength, fingerprint, originals: ready.length, blurred: fixed.length, heldBack: held.length }
+  return {
+    skipped, evidenceId, packEvidenceId, filename, size: zipped.byteLength, fingerprint,
+    originals: pack.summary.readyAsTaken, blurred: pack.summary.fixedWithBlur, heldBack: held.length,
+  }
 }
 
 /* ------------------------------------------------------------------ evidence.html */
@@ -196,7 +216,8 @@ type Pack = {
   exportedBy: { name: string; role: string }
   evidenceId: string
   options: { blurUnrecognisedFaces: boolean; blurStyle: string }
-  summary: { photosChecked: number; facesChecked: number; readyAsTaken: number; fixedWithBlur: number; heldBack: number }
+  summary: { photosChecked: number; facesChecked: number; readyAsTaken: number; fixedWithBlur: number; heldBack: number; leftOutUnreadable: number }
+  leftOut: SafeSetResult['skipped']
   noticeVersions: string[]
   photos: PhotoRecord[]
   heldBack: HeldRecord[]
@@ -297,6 +318,7 @@ footer{margin-top:28px;color:var(--ink3);font-size:12px}
 
 <div class="card"><h2>In this pack (${p.photos.length})</h2>${photos}</div>
 <div class="card"><h2>Held back (${p.heldBack.length})</h2>${held}</div>
+${p.leftOut.length ? `<div class="card"><h2>Left out: file could not be read (${p.leftOut.length})</h2>${p.leftOut.map((x) => `<p class="small"><strong>${esc(x.title ?? x.assetId)}</strong> · <span class="mono">${esc(x.assetId)}</span> · ${esc(x.reason)}</p>`).join('')}</div>` : ''}
 
 <footer><p>${esc(p.originals)}</p><p>${p.summary.photosChecked} photos and ${p.summary.facesChecked} faces checked.</p><p>${esc(p.disclaimer)}</p></footer>
 </main></body></html>`

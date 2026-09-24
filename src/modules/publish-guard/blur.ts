@@ -34,6 +34,8 @@ export interface RenderOptions {
   watermark?: string | null
   /** Draw into this canvas instead of allocating a new one (it is resized as needed). */
   canvas?: HTMLCanvasElement
+  /** Keep the resized source around for repeated renders (studio preview). Off for one-off full-size exports. */
+  cacheBase?: boolean
 }
 
 export const STRENGTH = { min: 1, max: 10, default: 6 } as const
@@ -86,34 +88,41 @@ export function canvasFilterSupported() {
 }
 
 const imageCache = new Map<string, Promise<HTMLImageElement>>()
-/** Load (and cache) an image for canvas use. Same-origin and data: URLs keep the canvas exportable. */
-export function loadImage(src: string): Promise<HTMLImageElement> {
-  let p = imageCache.get(src)
-  if (!p) {
-    p = new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image()
-      img.decoding = 'async'
-      if (!src.startsWith('data:') && !src.startsWith('blob:')) img.crossOrigin = 'anonymous'
-      img.onload = () => resolve(img)
-      img.onerror = () => {
-        imageCache.delete(src)
-        reject(new Error(`Could not load ${src.startsWith('data:') ? 'the uploaded photo' : src}`))
-      }
-      img.src = src
-    })
+const IMAGE_CACHE_MAX = 8
+/** Load an image for canvas use (the last few are cached). Same-origin and data: URLs keep the canvas exportable. */
+export function loadImage(src: string, cache = true): Promise<HTMLImageElement> {
+  const hit = cache ? imageCache.get(src) : undefined
+  if (hit) {
+    imageCache.delete(src) // refresh recency
+    imageCache.set(src, hit)
+    return hit
+  }
+  const p = new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.decoding = 'async'
+    if (!src.startsWith('data:') && !src.startsWith('blob:')) img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => {
+      imageCache.delete(src)
+      reject(new Error(`Could not load ${src.startsWith('data:') ? 'the uploaded photo' : src}`))
+    }
+    img.src = src
+  })
+  if (cache) {
     imageCache.set(src, p)
+    while (imageCache.size > IMAGE_CACHE_MAX) imageCache.delete(imageCache.keys().next().value!)
   }
   return p
 }
 
 const baseCache = new WeakMap<object, Map<string, HTMLCanvasElement>>()
-/** The untouched photo drawn at output size (cached for images, fresh for video frames). */
-export function baseCanvas(img: Drawable, maxSide?: number): HTMLCanvasElement {
+/** The untouched photo drawn at output size. With `cache`, reused for the same image and size (never for video frames). */
+export function baseCanvas(img: Drawable, maxSide?: number, cache = false): HTMLCanvasElement {
   const { w, h } = sourceSize(img)
   const k = maxSide ? Math.min(1, maxSide / Math.max(w, h)) : 1
   const W = Math.max(1, Math.round(w * k))
   const H = Math.max(1, Math.round(h * k))
-  const cacheable = img instanceof HTMLImageElement || (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap)
+  const cacheable = cache && (img instanceof HTMLImageElement || (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap))
   const key = `${W}x${H}`
   if (cacheable) {
     const hit = baseCache.get(img)?.get(key)
@@ -374,7 +383,7 @@ export function renderBlurred(
   strength: number = STRENGTH.default,
   opts: RenderOptions = {},
 ): HTMLCanvasElement {
-  const base = baseCanvas(img, opts.maxSide)
+  const base = baseCanvas(img, opts.maxSide, opts.cacheBase)
   const W = base.width
   const H = base.height
   const out = opts.canvas ?? makeCanvas(W, H)
@@ -419,7 +428,9 @@ export async function blobBytes(b: Blob): Promise<Uint8Array> {
 /** The original file bytes, untouched (works for /media/... and data: URLs). */
 export async function fetchBytes(src: string): Promise<Uint8Array> {
   const res = await fetch(src)
-  if (!res.ok) throw new Error(`Could not read ${src} (${res.status})`)
+  const type = res.headers.get('content-type') ?? ''
+  // a missing file can come back as the app's HTML page with status 200, never ship that as a photo
+  if (!res.ok || (type && !type.startsWith('image/'))) throw new Error(`Could not read ${src.startsWith('data:') ? 'the uploaded photo' : src}`)
   return new Uint8Array(await res.arrayBuffer())
 }
 
