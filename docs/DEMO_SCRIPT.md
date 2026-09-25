@@ -17,6 +17,11 @@ Start: Demo Director (`Ctrl/⌘+Shift+D`). Set the prospect's school name, city 
 | 11 | Chairman | Experts | Request a counsel review; the partner receives it with evidence attached. Close on **DPDP Managed**. |
 | 12 | Chairman | Evidence | Verify chain ✓ and export the audit pack. For IT visitors: Under the hood. |
 
+## Helping owners follow along
+- The **welcome** appears on first open (and after a reset). Walk through its 3 steps: parents choose → every photo is checked → proof for everything.
+- On any screen, tap **About this page** (top bar) for a plain-words explanation.
+- For owners who ask “what does the law actually require?”, open **DPDP in 2 minutes** (sidebar).
+
 ## Guardrails (say it this way)
 - Say "DPDP readiness / managed programme / coverage". Never "100% compliant" or "certified".
 - **Privacy contact ≠ statutory DPO.** A DPO, independent auditor and annual DPIA are required only if the school is notified as a Significant Data Fiduciary.

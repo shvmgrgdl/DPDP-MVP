@@ -4,7 +4,7 @@ import * as DD from '@radix-ui/react-dropdown-menu'
 import * as Pop from '@radix-ui/react-popover'
 import {
   Home, Compass, ScrollText, Images, ShieldCheck, Clapperboard, Inbox, Building2, FileCheck2, Users, MessageCircle, Settings, Cpu,
-  Search, Bell, ChevronDown, Check, HelpCircle, Smartphone,
+  Search, Bell, ChevronDown, Check, HelpCircle, Smartphone, BookOpen,
 } from 'lucide-react'
 import { useApp } from '@/store/app'
 import { ROLES, ROLE, NAV_META, type NavKey } from '@/roles/roles'
@@ -15,6 +15,7 @@ import { EvidenceDrawer } from './EvidenceDrawer'
 import { DemoDirector } from './DemoDirector'
 import { CommandPalette } from './CommandPalette'
 import { StoryBar } from './StoryBar'
+import { ExplainButton, Welcome } from './Guidance'
 
 const NAV_ICON: Record<NavKey, React.ReactNode> = {
   home: <Home className="size-[18px]" />, readiness: <Compass className="size-[18px]" />, privacy: <ScrollText className="size-[18px]" />,
@@ -74,9 +75,12 @@ function Sidebar() {
         ))}
       </nav>
       <div className="border-t border-line p-3">
-        <button type="button" onClick={() => setUI({ paletteOpen: true })} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-ink-2 hover:bg-sunken">
-          <HelpCircle className="size-[18px]" /> Help & guided tour
+        <button type="button" onClick={() => setUI({ welcomeOpen: true })} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-ink-2 hover:bg-sunken">
+          <HelpCircle className="size-[18px]" /> How it works
         </button>
+        <NavLink to="/guide" className={({ isActive }) => cn('flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] hover:bg-sunken', isActive ? 'bg-sunken font-semibold text-ink' : 'text-ink-2')}>
+          <BookOpen className="size-[18px]" /> DPDP in 2 minutes
+        </NavLink>
         <p className="px-3 pt-2 text-[10.5px] leading-snug text-ink-3">Not legal advice. Templates reviewed by empanelled privacy counsel.</p>
       </div>
     </aside>
@@ -163,6 +167,7 @@ function TopBar() {
         <Search className="size-4" /> Search students, photos, requests… <kbd className="ml-auto rounded border border-line px-1.5 text-[11px]">⌘K</kbd>
       </button>
       <div className="ml-auto flex items-center gap-2">
+        <ExplainButton />
         <RoleSwitcher />
         <Notifications />
         {person && <Avatar name={person.name} size={34} />}
@@ -178,7 +183,7 @@ function GuestFrame({ children, label }: { children: React.ReactNode; label: str
       <header className="no-print sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-canvas/85 px-6 backdrop-blur">
         <BrandMark size={28} /><span className="font-display font-semibold">School DPDP OS</span>
         <span className="rounded-full bg-sunken px-2.5 py-1 text-[12px] font-semibold text-ink-2">{label}</span>
-        <div className="ml-auto flex items-center gap-2"><RoleSwitcher /></div>
+        <div className="ml-auto flex items-center gap-2"><ExplainButton /><RoleSwitcher /></div>
       </header>
       {children}
     </div>
@@ -198,7 +203,7 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const overlays = (<><EvidenceDrawer /><DemoDirector /><CommandPalette /><StoryBar /></>)
+  const overlays = (<><EvidenceDrawer /><DemoDirector /><CommandPalette /><StoryBar /><Welcome /></>)
 
   if (def.mobile && loc.pathname.startsWith('/parent')) {
     return (

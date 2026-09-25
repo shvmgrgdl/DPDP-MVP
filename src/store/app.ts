@@ -27,6 +27,8 @@ export interface UIState {
   evidenceDrawer: string | null // evidence id
   paletteOpen: boolean
   hydrated: boolean
+  welcomeOpen: boolean
+  welcomed: boolean
 }
 
 export interface Actions {
@@ -58,7 +60,7 @@ export interface Actions {
 export type AppState = AppData & UIState & Actions
 
 const initialUI: UIState = {
-  role: 'chairman', storyStep: null, techOverlay: false, directorOpen: false, evidenceDrawer: null, paletteOpen: false, hydrated: false,
+  role: 'chairman', storyStep: null, techOverlay: false, directorOpen: false, evidenceDrawer: null, paletteOpen: false, hydrated: false, welcomeOpen: false, welcomed: false,
 }
 
 let seq = 5000
@@ -88,7 +90,7 @@ export const useApp = create<AppState>()(
         updateSchool: (p) => set({ school: { ...get().school, ...p } }),
         resetDemo: () => {
           const keep = { school: get().school }
-          set({ ...createSeed(), ...initialUI, hydrated: true, school: { ...createSeed().school, name: keep.school.name, shortName: keep.school.shortName, city: keep.school.city, logoDataUrl: keep.school.logoDataUrl } })
+          set({ ...createSeed(), ...initialUI, hydrated: true, welcomeOpen: true, school: { ...createSeed().school, name: keep.school.name, shortName: keep.school.shortName, city: keep.school.city, logoDataUrl: keep.school.logoDataUrl } })
         },
         addEvidence,
         setPermission: (studentId, purpose, status, o) => {
@@ -200,7 +202,7 @@ export const useApp = create<AppState>()(
       version: DATA_VERSION,
       storage: createJSONStorage(() => idbStorage),
       partialize: (s) => {
-        const { hydrated, paletteOpen, directorOpen, evidenceDrawer, ...rest } = s
+        const { hydrated, paletteOpen, directorOpen, evidenceDrawer, welcomeOpen, ...rest } = s
         return Object.fromEntries(Object.entries(rest).filter(([, v]) => typeof v !== 'function')) as Partial<AppState>
       },
       migrate: () => ({}) as AppState, // version bump → fresh seed
@@ -210,7 +212,7 @@ export const useApp = create<AppState>()(
           const all = [...state.evidence, ...state.tasks, ...state.notifications, ...state.publications, ...state.experts, ...state.requests].map((x) => x.id)
           for (const id of all) { const n = Number(/(\d+)$/.exec(id)?.[1] ?? 0); if (n >= seq && n < 1e7) seq = n + 1 }
         }
-        useApp.setState({ hydrated: true })
+        useApp.setState({ hydrated: true, welcomeOpen: !state?.welcomed })
       },
     },
   ),

@@ -29,6 +29,7 @@ export const router = createHashRouter([
       { path: 'trust/*', lazy: mod(() => import('@/modules/trust-centre')) },
       { path: 'evidence/*', lazy: mod(() => import('@/modules/evidence')) },
       { path: 'experts/*', lazy: mod(() => import('@/modules/experts')) },
+      { path: 'guide/*', lazy: mod(() => import('@/modules/guide')) },
       { path: 'ask/*', lazy: mod(() => import('@/modules/ask')) },
       { path: 'settings/*', lazy: mod(() => import('@/modules/settings')) },
       { path: 'tech/*', lazy: mod(() => import('@/modules/tech')) },

@@ -36,9 +36,11 @@ Role definitions, nav and abilities are in `src/roles/roles.ts`.
 | **ask** | `/ask` | Offline assistant: ~20 intents answered from live data with sources; escalates to the desk |
 | **settings** | `/settings/*` | School profile, people, notifications, languages, integrations (Live / Pilot / Roadmap), plan, image credits |
 | **tech** | `/tech` | Architecture diagram, life of a photo, security model, face-data policy, API preview |
+| **guide** | `/guide` | “DPDP in 2 minutes” for owners: what the law asks (8 things), school exemptions vs what needs consent, penalties, the DPO myth, and a glossary |
 | **auth** | `/login` | Branded sign-in (SSO/OTP simulated) |
 
 ## Shared building blocks
+- **Guidance for non-experts:** a first-run *welcome* (3 steps, reopened via “How it works” in the sidebar) and an *“About this page”* button on every screen (what it is / why it matters / what you do), from `src/shell/Guidance.tsx` and `src/shell/explain.ts`
 - `src/shell/`: app shell, role switcher, ⌘K palette, notifications, evidence drawer, Demo Director, Story mode (`story.ts`)
 - `src/design/`: UI kit (`ui.tsx`) and media components (`media.tsx`: PhotoFaces, blur patches, verdict chips, phone frame)
 - `src/engine/permission.ts`: the consent engine (`evaluateAsset`, `decisionTrace`, `affectedPublications`)
