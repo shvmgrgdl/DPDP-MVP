@@ -4,6 +4,7 @@ A calm, click-through demo of a privacy operating system for Indian K-12 schools
 
 **Promise:** *"You run the school. We run the privacy operating system."* The hero is **Media Safe**: every school photo and video is checked against each parent's choices before it goes anywhere, and blocked children are blurred automatically. Around it sits one calm control plane for the rest of DPDP.
 
+- **Live demo:** https://school-dpdp-os.netlify.app (password `SchoolDPDP@2026`)
 - **Private preview:** https://claude.ai/artifact/VeQojd6BqqVzsLdY1G3CA9
 - **Branch:** `claude/sweet-bardeen-d79fof`
 - **Hosting:** Netlify-ready (`netlify.toml`); see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
