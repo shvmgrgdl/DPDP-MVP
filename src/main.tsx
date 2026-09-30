@@ -15,6 +15,7 @@ import './index.css'
 import { router } from './app/router'
 import { useApp } from './store/app'
 import { BrandMark } from './shell/AppShell'
+import { PasswordGate } from './shell/PasswordGate'
 
 function Root() {
   const hydrated = useApp((s) => s.hydrated)
@@ -24,7 +25,7 @@ function Root() {
         <BrandMark /> <span className="font-display text-lg">School DPDP OS</span>
       </div>
     )
-  return <RouterProvider router={router} />
+  return <PasswordGate><RouterProvider router={router} /></PasswordGate>
 }
 
 ;(window as unknown as { __app: typeof useApp }).__app = useApp
