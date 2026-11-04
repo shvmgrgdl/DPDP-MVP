@@ -84,16 +84,16 @@ export const viewerLabelOf = (s: ReturnType<typeof useDemo.getState>) => s.role 
 export function useViewerLabel() { return useDemo(viewerLabelOf) }
 export const wmTime = (ms: number) => new Date(ms).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 
-/** Live, tiled watermark: viewer ID · current time · trace ID. Sized by container width so it reads on thumbnails and full screens alike. */
+/** Quiet watermark: one small stamp (viewer ID · time · trace) in the corner, plus a barely-there pattern on large views only.
+ *  Thumbnails under ~130px carry no visible text; faces and the picture stay clear. */
 export function Watermark({ photoId }: { photoId: string }) {
   const who = useViewerLabel(); const now = useNow()
   const text = `${who} · ${wmTime(now)} · ${traceId(who, photoId)}`
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 select-none overflow-hidden" style={{ containerType: 'inline-size' }}>
-      <div className="absolute left-[2cqw] top-[2cqw] rounded bg-black/45 px-[1.2cqw] py-[0.4cqw] font-bold text-white" style={{ fontSize: '2.4cqw' }}>{text}</div>
-      <div className="absolute bottom-[2cqw] right-[2cqw] rounded bg-black/45 px-[1.2cqw] py-[0.4cqw] font-bold text-white" style={{ fontSize: '2.4cqw' }}>{text}</div>
-      <div className="absolute -inset-[40%] flex -rotate-[24deg] flex-col justify-center gap-[5cqw]" style={{ fontSize: '2.6cqw' }}>
-        {Array.from({ length: 12 }, (_, r) => <div key={r} className="flex gap-[6cqw] whitespace-nowrap font-semibold text-white/55" style={{ textShadow: '0 0 3px rgba(0,0,0,.55)', marginLeft: r % 2 ? '-14cqw' : 0 }}>{Array.from({ length: 4 }, (_, c) => <span key={c}>{text}</span>)}</div>)}
+    <div aria-hidden className="@container pointer-events-none absolute inset-0 select-none overflow-hidden">
+      <div className="absolute bottom-[1.6cqw] right-[2cqw] hidden whitespace-nowrap rounded-full bg-black/25 px-[1.6cqw] py-[0.3cqw] font-medium text-white/80 @min-[130px]:block" style={{ fontSize: 'max(8px, 2.1cqw)' }}>{text}</div>
+      <div className="absolute -inset-[40%] hidden -rotate-[24deg] flex-col justify-center gap-[9cqw] @min-[320px]:flex" style={{ fontSize: '2.1cqw' }}>
+        {Array.from({ length: 7 }, (_, r) => <div key={r} className="flex gap-[10cqw] whitespace-nowrap font-medium text-white/[.13]" style={{ marginLeft: r % 2 ? '-18cqw' : 0 }}>{Array.from({ length: 3 }, (_, c) => <span key={c}>{text}</span>)}</div>)}
       </div>
     </div>
   )
@@ -105,7 +105,7 @@ export function LangPicker({ compact = false, dark = false }: { compact?: boolea
   return (
     <label className={cn('relative inline-flex items-center gap-1.5 rounded-full border px-3 text-xs font-bold', compact ? 'h-9' : 'h-10', dark ? 'border-white/25 bg-white/10 text-white' : 'border-line bg-white text-ink')}>
       <Languages className="size-3.5 shrink-0" />
-      <select aria-label={t("Language")} value={lang} onChange={(e) => setLang(e.target.value as Lang)} className="max-w-[7.5rem] cursor-pointer appearance-none bg-transparent pr-1 outline-none">
+      <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value as Lang)} className="max-w-[7.5rem] cursor-pointer appearance-none bg-transparent pr-1 outline-none">
         {LANGS.map((l) => <option key={l.code} value={l.code} className="text-ink">{l.name}</option>)}
       </select>
     </label>
