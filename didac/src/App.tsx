@@ -10,7 +10,8 @@ import { current, go, ROUTES, type Route } from './nav'
 import { Home } from './screens/Home'
 import { Story } from './screens/Story'
 import { Demo } from './screens/Demo'
-import { Law, Compare, Faq } from './screens/Info'
+import { Law, Faq } from './screens/Info'
+import { Security } from './screens/Security'
 import { Pilot } from './screens/Pilot'
 import { Team } from './screens/Team'
 import { OnePager } from './screens/OnePager'
@@ -29,7 +30,7 @@ function Booth() {
     return () => { window.removeEventListener('hashchange', h); window.removeEventListener('online', on); window.removeEventListener('offline', off); window.removeEventListener('beforeinstallprompt', bip) }
   }, [])
   if (route === 'cinema') return <Story bare />
-  const page = { home: <Home />, story: <Story />, demo: <Demo />, law: <Law />, compare: <Compare />, faq: <Faq />, pilot: <Pilot />, onepager: <OnePager />, team: <Team />, cinema: <Story bare /> }[route]
+  const page = { home: <Home />, story: <Story />, demo: <Demo />, law: <Law />, security: <Security />, faq: <Faq />, pilot: <Pilot />, onepager: <OnePager />, team: <Team />, cinema: <Story bare /> }[route]
   return (
     <div className="min-h-dvh">
       <header className="no-print sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur">

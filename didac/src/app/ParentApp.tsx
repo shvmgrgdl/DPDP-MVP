@@ -7,6 +7,7 @@ import { evaluate, PURPOSES, type Purpose } from '../data'
 import { Chip, PhotoView, Switch, fmtD } from '../ui'
 import { Zoom } from '../screens/Zoom'
 import { PhoneShell } from './PhoneShell'
+import { saveCopies } from '../lib/actions'
 
 type Stage = 'welcome' | 'login' | 'password' | 'notice' | 'consent' | 'confirm' | 'receipt' | 'app'
 type Tab = 'home' | 'photos' | 'inbox' | 'choices' | 'more'
@@ -187,7 +188,7 @@ function Onboarding({ stage, setStage, draft, setDraft, receipt, setReceipt, lan
         <p className="mt-3 text-xs text-ink-3">Privacy contact: privacy@sunrise-school.example (fictional)</p>
         <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-5" checked={read} onChange={(e) => setRead(e.target.checked)} />{t('I have read this notice.', 'मैंने यह सूचना पढ़ ली है।')}</label>
       </div>
-      <div className="p-5 pt-0"><Primary disabled={!read} onClick={() => { setCi(0); setStage('consent') }}>{t('Continue to my choices', 'मेरी पसंद पर जाएँ')}</Primary></div>
+      <div className="p-5 pt-0"><Primary disabled={!read} onClick={() => { s.logEvent('Notice read', `Notice v1.2 read in ${s.lang}.`); setCi(0); setStage('consent') }}>{t('Continue to my choices', 'मेरी पसंद पर जाएँ')}</Primary></div>
     </div>)
 
   if (stage === 'consent') {
@@ -296,7 +297,7 @@ function PhotosTab({ child, mine, setZoom, t }: { child: Child; mine: ReturnType
   const can = child.perms.album
   return (
     <div className="p-4 pb-20">
-      <div className="mb-3 flex items-center justify-between"><div><div className="text-lg font-bold">{t('My child’s photos', 'मेरे बच्चे की फ़ोटो')}</div><div className="text-xs text-ink-3">Annual Day · {mine.length} {t('photos', 'फ़ोटो')} · {t('others blurred', 'दूसरे धुंधले')}</div></div>
+      <div className="mb-3 flex items-center justify-between"><div><div className="text-lg font-bold">{t('My child’s photos', 'मेरे बच्चे की फ़ोटो')}</div><div className="mb-0.5 inline-flex items-center gap-1 rounded-full bg-ok-bg px-2 py-0.5 text-[10px] font-bold text-ok"><Lock className="size-3" />Encrypted · watermarked</div><div className="text-xs text-ink-3">Annual Day · {mine.length} {t('photos', 'फ़ोटो')} · {t('others blurred', 'दूसरे धुंधले')}</div></div>
         <button type="button" onClick={() => setSel(sel ? null : [])} className="rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold">{sel ? t('Cancel', 'रद्द') : t('Select', 'चुनें')}</button></div>
       {!can && <div className="mb-3 rounded-2xl bg-warn-bg p-3 text-sm text-warn">{t('Your private album is off. Turn it on in Choices to download or share.', 'आपका निजी एल्बम बंद है। डाउनलोड या साझा करने के लिए ‘पसंद’ में चालू करें।')}</div>}
       <div className="grid grid-cols-2 gap-2.5">
@@ -309,7 +310,7 @@ function PhotosTab({ child, mine, setZoom, t }: { child: Child; mine: ReturnType
       </div>
       {sel && sel.length > 0 && (
         <div className="fixed inset-x-0 bottom-16 z-10 mx-auto flex max-w-[380px] gap-2 rounded-2xl bg-navy p-2 shadow-2xl md:absolute md:bottom-20">
-          <button type="button" disabled={!can} onClick={() => { s.downloadPhotos(sel); toast.success(t(`${sel.length} saved to your device`, `${sel.length} आपके डिवाइस में सहेजी गईं`)); setSel(null) }} className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-gold text-sm font-bold text-white disabled:opacity-40"><Download className="size-4" />{t('Download', 'डाउनलोड')} ({sel.length})</button>
+          <button type="button" disabled={!can} onClick={() => { void saveCopies(sel); toast.success(t(`${sel.length} saved to your device`, `${sel.length} आपके डिवाइस में सहेजी गईं`)); setSel(null) }} className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-gold text-sm font-bold text-white disabled:opacity-40"><Download className="size-4" />{t('Download', 'डाउनलोड')} ({sel.length})</button>
           <button type="button" disabled={!can} onClick={() => { sel.forEach((id) => s.shareLink(id)); toast.success(t('Family link created · expires in 7 days', 'परिवार लिंक बना · 7 दिनों में समाप्त')); setSel(null) }} className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 text-sm font-bold text-white disabled:opacity-40"><Link2 className="size-4" />{t('Share link', 'लिंक साझा करें')}</button>
         </div>)}
       {s.shares.filter((x) => x.studentId === child.id).length > 0 && <div className="mt-5"><div className="eyebrow mb-1.5">{t('Active family links', 'सक्रिय परिवार लिंक')}</div>{s.shares.filter((x) => x.studentId === child.id).slice(0, 3).map((x) => <div key={x.id} className="mb-2 rounded-2xl border border-line bg-white p-3 text-xs"><div className="truncate font-mono">{x.link}</div><div className="text-ink-3">{t('Expires', 'समाप्ति')} {fmtD(x.expires)} · {t('only guardians’ family; downloaded copies can’t be recalled', 'केवल परिवार; डाउनलोड प्रतियाँ वापस नहीं ली जा सकतीं')}</div></div>)}</div>}
@@ -362,6 +363,7 @@ function MoreTab({ child, t, setStage }: { child: Child; t: T; setStage: (s: Sta
   const [text, setText] = React.useState('')
   const [open, setOpen] = React.useState(false)
   const cases = s.cases.filter((c) => c.studentId === child.id)
+  const [protect, setProtect] = React.useState(false)
   const row = (icon: React.ReactNode, label: string, on: () => void, sub?: string) => <button type="button" onClick={on} className="flex w-full items-center gap-3 rounded-2xl border border-line bg-white p-3.5 text-left"><span className="text-gold">{icon}</span><span className="flex-1 text-sm font-bold">{label}{sub && <span className="block text-xs font-normal text-ink-3">{sub}</span>}</span></button>
   return (
     <div className="space-y-3 p-4">
@@ -374,9 +376,13 @@ function MoreTab({ child, t, setStage }: { child: Child; t: T; setStage: (s: Sta
       </div>
       {row(<FileText className="size-5" />, t('Read the notice again', 'सूचना फिर पढ़ें'), () => { toast(t('Notice v1.2 · opened', 'सूचना v1.2 खुली')) ; }, 'v1.2 · English / हिन्दी')}
       <div className="card p-3.5 text-xs text-ink-2"><div className="mb-1 flex items-center gap-2 text-sm font-bold text-ink"><KeyRound className="size-4 text-gold" />{t('About your login', 'आपके लॉगिन के बारे में')}</div>{t(`Signed in as ID ${child.guardian}. This ID is random and was issued by the school. The app doesn’t store your name or phone number; the school keeps the link to your family. Your child’s name is partly hidden.`, `आईडी ${child.guardian} से साइन इन हैं। यह आईडी यादृच्छिक है और स्कूल ने जारी की है। ऐप आपका नाम या फ़ोन नंबर नहीं रखता; परिवार से संबंध स्कूल के पास है। आपके बच्चे का नाम आंशिक रूप से छिपा है।`)}</div>
+      {row(<ShieldCheck className="size-5" />, 'How your data is protected', () => setProtect(true), 'Encryption · watermarks · audit log')}
       {row(<Smartphone className="size-5" />, t('Replay onboarding', 'ऑनबोर्डिंग फिर चलाएँ'), () => setStage('welcome'))}
       {row(<LogOut className="size-5" />, t('Sign out', 'साइन आउट'), () => { s.signOut(); toast(t('Signed out', 'साइन आउट हो गए')) })}
       {row(<Lock className="size-5" />, t('Switch app', 'ऐप बदलें'), () => s.setRole(null))}
+      {protect && <div className="fixed inset-0 z-50 flex items-end bg-navy/60 md:absolute" onClick={() => setProtect(false)}><div className="pop max-h-[85%] w-full overflow-y-auto rounded-t-3xl bg-paper p-5" onClick={(e) => e.stopPropagation()}><div className="mb-2 flex items-center justify-between"><div className="text-lg font-bold">How your data is protected</div><button type="button" aria-label="Close" onClick={() => setProtect(false)} className="grid size-9 place-items-center rounded-full hover:bg-sand"><X className="size-5" /></button></div>
+        <ul className="space-y-3 text-sm text-ink-2">{[[Lock, 'Encrypted', 'Photos and records are encrypted when stored (AES-256) and when sent (TLS).'], [ShieldCheck, 'Watermarked', 'Every photo you open shows your school ID and the time, so a leaked copy can be traced.'], [KeyRound, 'Anonymous login', 'Your ID is random. The app holds no name or phone number; only the school can link the ID to your family.'], [FileText, 'Fully logged', 'Every sign-in, view, download and change is recorded in a tamper-evident log the school can audit.']].map(([I, h, b]) => { const Ic = I as typeof Lock; return <li key={h as string} className="flex gap-3"><Ic className="mt-0.5 size-5 shrink-0 text-gold" /><span><b className="text-ink">{h as string}</b><br />{b as string}</span></li> })}</ul>
+        <p className="mt-3 text-[11px] text-ink-3">Prototype: shows the design of the production protections. Watermarks make leaks traceable; they can’t stop a screenshot.</p></div></div>}
       <p className="pt-2 text-center text-[11px] text-ink-3"><X className="mr-1 inline size-3" />Prototype with synthetic data · not legal advice</p>
     </div>)
 }

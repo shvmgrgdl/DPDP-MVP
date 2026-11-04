@@ -19,7 +19,7 @@ export function Launcher() {
     ['admin', 'School admin', 'Review queue, permissions, requests, evidence', <LayoutDashboard key="b" className="size-6" />],
     ['gallery', 'School gallery', 'The web app: private gallery and the public website preview', <Images key="g" className="size-6" />],
     ['photographer', 'Photographer', 'Event-limited upload with face matching', <Camera key="c" className="size-6" />],
-    ['booth', 'Booth kit', 'Pitch, 75-second story, DPDP map, comparison, FAQs, pilot & QR', <Presentation key="d" className="size-6" />],
+    ['booth', 'Booth kit', 'Pitch, 90-second story, DPDP map, comparison, FAQs, pilot & QR', <Presentation key="d" className="size-6" />],
   ]
   return (
     <div className="min-h-dvh bg-navy px-5 py-10 text-white">

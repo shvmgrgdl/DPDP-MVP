@@ -111,20 +111,6 @@ export const FAQS: { q: string; a: string }[] = [
   { q: 'What does a pilot cost, and how does it run?', a: 'Start with a free 15-minute workflow assessment and a synthetic walkthrough. A bounded remote pilot around one real event follows only after your lawful-basis, safeguarding and processor review. We’ll scope it with you.' },
 ]
 
-export const DIFFS = ['India-first notices and Hindi for guardians', 'WhatsApp-compatible school sharing', 'A simpler, lower-cost one-event pilot', 'Human-first review of uncertain faces', 'Faster setup with local school systems and photographers']
-
-export const COMPARE: { feature: string; px: string; mg: string; note?: string }[] = [
-  { feature: 'Permission checked against every person in a group photo', px: 'Yes — public documentation describes restrictions applying when any relevant student restricts use.', mg: 'Shown in this prototype: one child’s “no public use” blocks the photo.' },
-  { feature: 'Unknown / unmatched faces', px: 'Documented: an untagged student can hold downloads until identification or review.', mg: 'Shown: unknown faces fail closed and go to a human review queue.' },
-  { feature: 'Parent self-service choices', px: 'Yes — parents manage purpose-level permissions.', mg: 'Shown: purpose-by-purpose choices, English and Hindi.' },
-  { feature: 'Evidence of who decided what', px: 'Not verified publicly — export and audit-log detail to confirm in a vendor demo.', mg: 'Shown: hash-chained decision log with activity per photo.' },
-  { feature: 'Staff mobile capture, archive import, SIS/ERP sync, SSO', px: 'Yes — established, with named integration partners.', mg: 'Not in this prototype. Not claimed.' },
-  { feature: 'Track record', px: 'Founded 2012; claims 380+ schools (company claim, not audited); ISO 27001 claimed.', mg: 'No paid school deployment yet. This is a prototype.' },
-  { feature: 'India-first workflow', px: 'India clients since 2022 (company history); current India footprint unverified.', mg: 'Designed around Indian school events, Hindi notices and WhatsApp-style sharing — to be validated with schools.' },
-  { feature: 'Face recognition boundary', px: 'Company states matching works inside one school’s gallery only.', mg: 'Designed the same way; child-face matching needs legal review and a manual alternative first.' },
-  { feature: 'Reach after sharing', px: 'Hosted links can be withdrawn; downloaded copies cannot be recalled.', mg: 'Same boundary — we say it plainly.' },
-]
-
 /** Demo credentials, as printed on the school's login slips. In a real deployment only salted hashes are stored, and the ID → family mapping stays in the school's own records. */
 export const ACCOUNTS0: Record<string, { id: string; temp: string; password: string; mustChange: boolean; failed: number; resets: number }> = {
   S1: { id: 'G-9M2X', temp: 'cedar-lamp-352', password: 'cedar-lamp-352', mustChange: false, failed: 0, resets: 0 },

@@ -4,8 +4,9 @@ import { useDemo, verifyChain } from '../store'
 import { evaluate, PURPOSES } from '../data'
 import { Btn, Chip, PhotoView, StateChip, fmtD } from '../ui'
 import { Zoom } from './Zoom'
+import { SecurityPanel, AuditLog } from './Security'
 
-type Tab = 'queue' | 'perms' | 'requests' | 'logins' | 'evidence'
+type Tab = 'queue' | 'perms' | 'requests' | 'logins' | 'security' | 'evidence'
 export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (id: string) => void }) {
   const [tab, setTab] = React.useState<Tab>('queue')
   React.useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<Tab>).detail); window.addEventListener('admin-tab', h); return () => window.removeEventListener('admin-tab', h) }, [])
@@ -15,7 +16,7 @@ export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (i
   const photo = s.photos.find((p) => p.id === focusPhoto) ?? s.photos[0]
   const ev = evaluate(photo, s.students, !!s.published[photo.id])
   const counts = s.photos.reduce((a, p) => { const k = evaluate(p, s.students, !!s.published[p.id]).state; a[k] = (a[k] ?? 0) + 1; return a }, {} as Record<string, number>)
-  const tabs: [Tab, string, React.ReactNode][] = [['queue', 'Review queue', <ListChecks key="a" className="size-4" />], ['perms', 'Permissions', <Table2 key="b" className="size-4" />], ['requests', `Requests${s.cases.filter((c) => c.status === 'open').length + s.requests.filter((r) => r.status === 'pending').length + s.photos.filter((p) => evaluate(p, s.students, !!s.published[p.id]).state === 'takedown').length ? ' ·' + (s.cases.filter((c) => c.status === 'open').length + s.requests.filter((r) => r.status === 'pending').length + s.photos.filter((p) => evaluate(p, s.students, !!s.published[p.id]).state === 'takedown').length) : ''}`, <Inbox key="r" className="size-4" />], ['logins', 'Parent logins', <KeyRound key="l" className="size-4" />], ['evidence', 'Evidence', <ScrollText key="c" className="size-4" />]]
+  const tabs: [Tab, string, React.ReactNode][] = [['queue', 'Review queue', <ListChecks key="a" className="size-4" />], ['perms', 'Permissions', <Table2 key="b" className="size-4" />], ['requests', `Requests${s.cases.filter((c) => c.status === 'open').length + s.requests.filter((r) => r.status === 'pending').length + s.photos.filter((p) => evaluate(p, s.students, !!s.published[p.id]).state === 'takedown').length ? ' ·' + (s.cases.filter((c) => c.status === 'open').length + s.requests.filter((r) => r.status === 'pending').length + s.photos.filter((p) => evaluate(p, s.students, !!s.published[p.id]).state === 'takedown').length) : ''}`, <Inbox key="r" className="size-4" />], ['logins', 'Parent logins', <KeyRound key="l" className="size-4" />], ['security', 'Security', <Lock key="sec" className="size-4" />], ['evidence', 'Evidence', <ScrollText key="c" className="size-4" />]]
   const faceObj = face !== null ? photo.faces[face] : null
 
   return (
@@ -23,7 +24,7 @@ export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (i
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-navy px-4 py-3 text-white">
         <div><div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Admin console · laptop</div><div className="font-bold">Annual Day · Sunrise Public School (fictional)</div></div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <Chip tone="risk">{counts.blocked ?? 0} blocked</Chip><Chip tone="warn">{counts.review ?? 0} to review</Chip><Chip tone="info">{counts.eligible ?? 0} eligible</Chip><Chip tone="ok">{(counts.published ?? 0) + (counts.takedown ?? 0)} published</Chip>
+          <Chip tone="ok"><Lock className="size-3" /> Encrypted</Chip><Chip tone="risk">{counts.blocked ?? 0} blocked</Chip><Chip tone="warn">{counts.review ?? 0} to review</Chip><Chip tone="info">{counts.eligible ?? 0} eligible</Chip><Chip tone="ok">{(counts.published ?? 0) + (counts.takedown ?? 0)} published</Chip>
         </div>
       </div>
       <div className="flex gap-1 border-b border-line bg-sand p-1.5">
@@ -113,23 +114,9 @@ export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (i
 
       {tab === 'logins' && <Logins />}
 
-      {tab === 'evidence' && (
-        <div className="p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm text-ink-2">Every decision is chained to the one before it. Edit any entry and the chain breaks.</div>
-            <Chip tone={verifyChain(s.audit) ? 'ok' : 'risk'}>{verifyChain(s.audit) ? `Chain verified · ${s.audit.length} entries` : 'Chain broken'}</Chip>
-          </div>
-          <ol className="max-h-[420px] space-y-2 overflow-auto">
-            {s.audit.slice().reverse().map((a) => (
-              <li key={a.n} className="rounded-xl border border-line bg-white p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-1"><span className="font-semibold">#{a.n} · {a.action}{a.photoId ? ` · ${a.photoId}` : ''}</span><span className="text-xs text-ink-3">{fmtD(a.t)}</span></div>
-                <div className="text-xs text-ink-2">{a.actor} — {a.detail}</div>
-                <div className="mt-1 font-mono text-[10px] text-ink-3">{a.hash}</div>
-              </li>))}
-          </ol>
-          <p className="mt-3 text-xs text-ink-3">This is a readiness record, not a compliance certificate.</p>
-        </div>
-      )}
+      {tab === 'security' && <div className="p-4"><SecurityPanel /></div>}
+
+      {tab === 'evidence' && <AuditLog />}
       {zoom && <Zoom photoId={zoom} onClose={() => setZoom(null)} />}
     </div>
   )

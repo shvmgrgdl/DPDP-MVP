@@ -18,7 +18,7 @@ export function Home() {
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               <Btn variant="gold" onClick={() => go('demo')}>See it in 2 minutes <ArrowRight className="size-4" /></Btn>
-              <Btn variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={() => go('story')}><Play className="size-4" /> Watch the 75-second story</Btn>
+              <Btn variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={() => go('story')}><Play className="size-4" /> Watch the 90-second story</Btn>
               <Btn variant="ghost" className="text-white hover:bg-white/10" onClick={() => go('pilot')}>Free 15-minute assessment</Btn>
             </div>
           </div>
@@ -48,7 +48,7 @@ export function Home() {
         <div className="mt-4 card flex flex-wrap items-center justify-between gap-4 p-5">
           <div><div className="font-bold">What you’ll see</div><p className="text-sm text-ink-2">A prototype with synthetic children: school gallery, parent app on a phone, admin console on a laptop, photo activity trail, and an honest comparison.</p></div>
           <div className="flex flex-wrap gap-2">
-            <Btn variant="outline" onClick={() => go('onepager')}>One-pager</Btn><Btn variant="outline" onClick={() => go('law')}>DPDP Act map</Btn><Btn variant="outline" onClick={() => go('compare')}>Versus Pixevety</Btn><Btn variant="outline" onClick={() => go('faq')}>FAQs</Btn>
+            <Btn variant="outline" onClick={() => go('onepager')}>One-pager</Btn><Btn variant="outline" onClick={() => go('law')}>DPDP Act map</Btn><Btn variant="outline" onClick={() => go('faq')}>FAQs</Btn>
           </div>
         </div>
       </section>

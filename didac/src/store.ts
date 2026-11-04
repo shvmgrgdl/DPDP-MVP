@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { sha256 } from '@/lib/utils'
+import { sessionId, traceId } from './lib/fake'
 import { ACCOUNTS0, PHOTOS0, STUDENTS0, UPLOAD_PHOTO, type Photo, type Purpose, type Student } from './data'
 
 export type Viewer = 'admin' | 'parent' | 'gallery'
 export type AppRole = 'parent' | 'admin' | 'photographer' | 'gallery' | 'booth' | null
-export interface AuditEntry { n: number; t: string; actor: string; action: string; photoId?: string; detail: string; prev: string; hash: string }
+export interface AuditEntry { n: number; t: string; actor: string; action: string; photoId?: string; detail: string; app: string; lang: string; sid: string; trace?: string; prev: string; hash: string }
 export interface Lead {
   id: string; at: string; name: string; school: string; role: string; city: string; phone: string
   q1: string; q2: string; q3: 'yes' | 'maybe' | 'no' | ''; optIn: boolean; source: string
@@ -26,6 +27,7 @@ interface State {
   accounts: Record<string, Account>; session: string | null
   role: AppRole; viewer: Viewer; childId: string; lang: 'en' | 'hi'
   setRole: (r: AppRole) => void
+  logEvent: (action: string, detail: string, photoId?: string, trace?: string) => void
   login: (id: string, pw: string) => 'ok' | 'bad' | 'locked'
   signOut: () => void
   signInAs: (sid: string) => void
@@ -63,11 +65,15 @@ const addDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString()
 const rid = (p: string) => p + '-' + Math.random().toString(36).slice(2, 6).toUpperCase()
 const PN: Record<Purpose, string> = { album: 'private parent album', internal: 'inside school', public: 'website & social' }
 
-function append(audit: AuditEntry[], e: Omit<AuditEntry, 'n' | 't' | 'prev' | 'hash'>): AuditEntry[] {
+function append(audit: AuditEntry[], e: Omit<AuditEntry, 'n' | 't' | 'prev' | 'hash' | 'app' | 'lang' | 'sid'>): AuditEntry[] {
   const prev = audit.length ? audit[audit.length - 1].hash : genesis
   const t = now()
-  const hash = sha256(prev + JSON.stringify({ ...e, t }))
-  return [...audit, { ...e, n: audit.length + 1, t, prev, hash }]
+  let g: ReturnType<typeof useDemo.getState> | undefined
+  try { g = useDemo.getState() } catch { /* store not created yet (seed) */ }
+  const ctx = { app: g?.role ?? 'launcher', lang: g?.lang ?? 'en', sid: sessionId }
+  const full = { ...e, ...ctx }
+  const hash = sha256(prev + JSON.stringify({ ...full, t }))
+  return [...audit, { ...full, n: audit.length + 1, t, prev, hash }]
 }
 export function verifyChain(audit: AuditEntry[]) {
   let prev = genesis
@@ -80,6 +86,7 @@ export function verifyChain(audit: AuditEntry[]) {
 }
 const seedAudit = () => append(append([], { actor: 'System', action: 'Workspace created', detail: 'Annual Day event workspace with synthetic roster (4 students).' }), { actor: 'Photographer · Studio Lens', action: 'Uploaded 5 photos', detail: 'Faces detected and matched to roster; unmatched faces held for review.' })
 const initial = () => ({ students: STUDENTS0, photos: PHOTOS0, published: {} as Record<string, boolean>, audit: seedAudit(), requests: [] as GuardianRequest[], cases: [] as Case[], shares: [] as Share[], accounts: ACCOUNTS0, session: null as string | null })
+const actorNow = (s: { role: AppRole; viewer: Viewer; session: string | null; childId: string; accounts: Record<string, Account> }) => s.role === 'photographer' ? 'Photographer · Studio Lens' : s.viewer === 'parent' || s.role === 'parent' ? `Guardian ${s.accounts[s.session ?? s.childId]?.id ?? ''}`.trim() : s.viewer === 'admin' || s.role === 'admin' ? 'School admin · Principal’s office' : 'Gallery viewer'
 const guardianOf = (s: { students: Student[] }, sid: string) => { const st = s.students.find((x) => x.id === sid)!; return { st, actor: `Guardian ${st.guardian}` } }
 
 export const useDemo = create<State>()(
@@ -87,9 +94,10 @@ export const useDemo = create<State>()(
     (set, get) => ({
       ...initial(), leads: [], visitors: 0, settings: { waNumber: (import.meta.env.VITE_WA_NUMBER as string | undefined)?.replace(/\D/g, '') ?? '', eventTag: 'DIDAC 2026', contactEmail: '', contactPhone: '', owners: 'Shivam, Additya' }, role: null, viewer: 'admin', childId: 'S2', lang: 'en',
       setRole: (role) => set({ role }),
+      logEvent: (action, detail, photoId, trace) => set((s) => ({ audit: append(s.audit, { actor: actorNow(s), action, detail, photoId, trace }) })),
       setViewer: (viewer) => set({ viewer }),
       setChild: (childId) => set({ childId }),
-      setLang: (lang) => set({ lang }),
+      setLang: (lang) => set((s) => (s.lang === lang ? {} : { lang, audit: append(s.audit, { actor: actorNow(s), action: 'Language changed', detail: `Interface language set to ${lang}.` }) })),
       setPerm: (sid, p, v) => set((s) => {
         const { st, actor } = guardianOf(s, sid)
         if (st.perms[p] === v) return {}
@@ -101,14 +109,14 @@ export const useDemo = create<State>()(
       setAskEach: (sid, v) => set((s) => ({ students: s.students.map((x) => (x.id === sid ? { ...x, askEach: v } : x)) })),
       login: (id, pw) => {
         const s = get(); const sid = Object.keys(s.accounts).find((k) => s.accounts[k].id === id.trim().toUpperCase())
-        if (!sid) return 'bad'
+        if (!sid) { set({ audit: append(s.audit, { actor: 'Unknown ID', action: 'Sign-in failed', detail: 'ID not recognised.' }) }); return 'bad' }
         const a = s.accounts[sid]
-        if (a.failed >= 5) return 'locked'
-        if (a.password !== pw) { set({ accounts: { ...s.accounts, [sid]: { ...a, failed: a.failed + 1 } } }); return a.failed + 1 >= 5 ? 'locked' : 'bad' }
+        if (a.failed >= 5) { set({ audit: append(s.audit, { actor: `Guardian ${a.id}`, action: 'Sign-in blocked', detail: 'Account is locked after repeated failures.' }) }); return 'locked' }
+        if (a.password !== pw) { set({ accounts: { ...s.accounts, [sid]: { ...a, failed: a.failed + 1 } }, audit: append(s.audit, { actor: `Guardian ${a.id}`, action: a.failed + 1 >= 5 ? 'Account locked' : 'Sign-in failed', detail: `Wrong password (attempt ${a.failed + 1} of 5).` }) }); return a.failed + 1 >= 5 ? 'locked' : 'bad' }
         set({ accounts: { ...s.accounts, [sid]: { ...a, failed: 0 } }, session: sid, childId: sid, audit: append(s.audit, { actor: `Guardian ${a.id}`, action: 'Signed in', detail: 'School-issued ID. No name or phone number is held by this app.' }) })
         return 'ok'
       },
-      signOut: () => set({ session: null }),
+      signOut: () => set((s) => ({ session: null, audit: s.session ? append(s.audit, { actor: `Guardian ${s.accounts[s.session].id}`, action: 'Signed out', detail: 'Session ended.' }) : s.audit })),
       signInAs: (sid) => set((s) => ({ session: sid, childId: sid, accounts: { ...s.accounts, [sid]: { ...s.accounts[sid], mustChange: false } } })),
       changePassword: (sid, pw) => set((s) => ({ accounts: { ...s.accounts, [sid]: { ...s.accounts[sid], password: pw, mustChange: false } }, audit: append(s.audit, { actor: `Guardian ${s.accounts[sid].id}`, action: 'Password changed', detail: 'Temporary password replaced at first sign-in.' }) })),
       resetPassword: (sid) => { const s = get(); const w = ['maple', 'river', 'cedar', 'lamp', 'olive', 'moon', 'coral', 'bell', 'amber', 'pine']; const temp = `${w[Math.floor(Math.random() * 10)]}-${w[Math.floor(Math.random() * 10)]}-${100 + Math.floor(Math.random() * 900)}`; set({ accounts: { ...s.accounts, [sid]: { ...s.accounts[sid], temp, password: temp, mustChange: true, failed: 0, resets: s.accounts[sid].resets + 1 } }, audit: append(s.audit, { actor: 'School admin · Principal’s office', action: 'Login reissued', detail: `New temporary password issued for ${s.accounts[sid].id}; guardian must change it at next sign-in.` }) }); return temp },
@@ -143,7 +151,7 @@ export const useDemo = create<State>()(
         const who = s.viewer === 'parent' ? guardianOf(s, s.childId).actor : s.viewer === 'admin' ? 'School admin · Principal’s office' : 'Gallery viewer'
         return { audit: append(s.audit, { actor: who, action: 'Opened photo', photoId, detail: `Viewed in ${s.viewer === 'parent' ? 'parent app' : s.viewer === 'admin' ? 'admin console' : 'school gallery'}.` }) }
       }),
-      downloadPhotos: (ids) => set((s) => { const { actor } = guardianOf(s, s.childId); let audit = s.audit; ids.forEach((id) => { audit = append(audit, { actor, action: 'Downloaded photo', photoId: id, detail: 'Original saved to guardian’s device. Copies outside the app cannot be recalled.' }) }); return { audit } }),
+      downloadPhotos: (ids) => set((s) => { const { actor } = guardianOf(s, s.childId); let audit = s.audit; ids.forEach((id) => { const tr = traceId(actor, id); audit = append(audit, { actor, action: 'Downloaded photo', photoId: id, trace: tr, detail: `Watermarked copy saved to the guardian’s device (trace ${tr}). Copies outside the app cannot be recalled.` }) }); return { audit } }),
       shareLink: (photoId) => {
         const s = get(); const { actor } = guardianOf(s, s.childId)
         const sh: Share = { id: rid('SH'), photoId, link: `https://media.school.example/s/${Math.random().toString(36).slice(2, 8)}`, expires: addDays(7), studentId: s.childId }

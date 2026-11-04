@@ -2,6 +2,9 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import type { Evaluation, Photo, Student } from './data'
 import { STATE_META } from './data'
+import { useDemo } from './store'
+import { useNow } from './lib/useNow'
+import { traceId } from './lib/fake'
 
 export const pub = (p: string) => p
 
@@ -37,13 +40,14 @@ export const SectionTitle = ({ eyebrow, title, sub }: { eyebrow?: string; title:
 )
 
 /** Photo at natural aspect, so normalised face boxes map straight to percentages. */
-export function PhotoView({ photo, students, mode = 'plain', ev, blurRestricted, highlightId, onFaceClick, selected, className }: {
+export function PhotoView({ photo, students, mode = 'plain', ev, blurRestricted, highlightId, onFaceClick, selected, className, watermark = true }: {
   photo: Photo; students: Student[]; mode?: 'plain' | 'admin' | 'parent'; ev?: Evaluation; blurRestricted?: boolean; highlightId?: string
-  onFaceClick?: (i: number) => void; selected?: number | null; className?: string
+  onFaceClick?: (i: number) => void; selected?: number | null; className?: string; watermark?: boolean
 }) {
   return (
     <div className={cn('relative w-full overflow-hidden rounded-xl bg-sand', className)} style={{ aspectRatio: `${photo.w} / ${photo.h}` }}>
-      <img src={pub(photo.src)} alt={photo.title} className="absolute inset-0 size-full object-cover" draggable={false} />
+      <img src={pub(photo.src)} alt={photo.title} className="absolute inset-0 size-full select-none object-cover [-webkit-touch-callout:none]" draggable={false} onContextMenu={(e) => e.preventDefault()} />
+      {watermark && <Watermark photoId={photo.id} />}
       {photo.faces.map((f, i) => {
         const st = students.find((s) => s.id === f.studentId)
         const [x, y, w, h] = f.box
@@ -69,3 +73,21 @@ export function PhotoView({ photo, students, mode = 'plain', ev, blurRestricted,
 
 export const fmtT = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 export const fmtD = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+/** Who is looking right now — school-issued ID or role, never a personal name. */
+export const viewerLabelOf = (s: ReturnType<typeof useDemo.getState>) => s.role === 'photographer' ? 'Photographer' : s.viewer === 'parent' || s.role === 'parent' ? `Guardian ${s.accounts[s.session ?? s.childId]?.id ?? ''}`.trim() : s.viewer === 'admin' || s.role === 'admin' ? 'School admin' : 'Gallery viewer'
+export function useViewerLabel() { return useDemo(viewerLabelOf) }
+export const wmTime = (ms: number) => new Date(ms).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+
+/** Live, tiled watermark: viewer ID · current time · trace ID. Sized by container width so it reads on thumbnails and full screens alike. */
+export function Watermark({ photoId }: { photoId: string }) {
+  const who = useViewerLabel(); const now = useNow()
+  const text = `${who} · ${wmTime(now)} · ${traceId(who, photoId)}`
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 select-none overflow-hidden" style={{ containerType: 'inline-size' }}>
+      <div className="absolute -inset-[40%] flex -rotate-[24deg] flex-col justify-center gap-[7cqw]" style={{ fontSize: '2.6cqw' }}>
+        {Array.from({ length: 9 }, (_, r) => <div key={r} className="flex gap-[6cqw] whitespace-nowrap font-semibold text-white/55" style={{ textShadow: '0 0 3px rgba(0,0,0,.55)', marginLeft: r % 2 ? '-14cqw' : 0 }}>{Array.from({ length: 4 }, (_, c) => <span key={c}>{text}</span>)}</div>)}
+      </div>
+    </div>
+  )
+}

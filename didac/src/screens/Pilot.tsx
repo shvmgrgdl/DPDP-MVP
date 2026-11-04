@@ -47,7 +47,7 @@ export function Pilot() {
           <div className="flex items-center justify-between"><div className="text-lg font-bold">Book your assessment</div><Chip tone="gold">{eventTag}</Chip></div>
           {done ? (
             <div className="rounded-xl bg-ok-bg p-4 text-sm text-ok"><b>Thank you, {done.name}.</b> We’ll be in touch to fix a time.
-              {done.optIn && done.phone && <div className="mt-3"><a className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-ok px-4 font-semibold text-white" target="_blank" rel="noreferrer" href={waLink(`Hello from DPDPA for Schools (${eventTag}). Here is the 75-second MediaGuard story and a link to book your free 15-minute workflow assessment: ${appUrl()}#/story`, done.phone.replace(/\D/g, '').replace(/^(\d{10})$/, '91$1'))}><MessageCircle className="size-4" /> Send my demo on WhatsApp</a></div>}
+              {done.optIn && done.phone && <div className="mt-3"><a className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-ok px-4 font-semibold text-white" target="_blank" rel="noreferrer" href={waLink(`Hello from DPDPA for Schools (${eventTag}). Here is the 90-second MediaGuard story and a link to book your free 15-minute workflow assessment: ${appUrl()}#/story`, done.phone.replace(/\D/g, '').replace(/^(\d{10})$/, '91$1'))}><MessageCircle className="size-4" /> Send my demo on WhatsApp</a></div>}
               <button type="button" className="mt-3 block text-xs underline" onClick={() => setDone(null)}>Add another</button></div>
           ) : (<>
             <div className="grid gap-3 sm:grid-cols-2">

@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { X, Eye, ShieldAlert, Download, Link2, Flag, Trash2 } from 'lucide-react'
+import { X, Eye, ShieldAlert, Download, Link2, Flag, Trash2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
+import { saveCopies } from '../lib/actions'
 import { useDemo, verifyChain } from '../store'
 import { evaluate } from '../data'
 import { Chip, PhotoView, StateChip, fmtD } from '../ui'
@@ -22,12 +23,12 @@ export function Zoom({ photoId, onClose }: { photoId: string; onClose: () => voi
         </div>
         <aside className="flex w-full flex-col gap-3 overflow-auto p-4 md:w-[340px]">
           <div className="flex items-start justify-between gap-2">
-            <div><div className="eyebrow">Photo activity</div><div className="text-lg font-bold">Who opened it, when</div></div>
+            <div><div className="eyebrow">Photo activity</div><span className="mt-1 inline-flex items-center gap-1 rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-bold text-ok"><Lock className="size-3" /> Encrypted · watermarked</span><div className="text-lg font-bold">Who opened it, when</div></div>
             <button type="button" aria-label="Close" onClick={onClose} className="grid size-10 place-items-center rounded-xl hover:bg-sand"><X className="size-5" /></button>
           </div>
           {viewer === 'parent' ? (
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={!child.perms.album} onClick={() => { downloadPhotos([photoId]); toast.success('Saved to your device') }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-navy text-sm font-bold text-white disabled:opacity-40"><Download className="size-4" />Download</button>
+              <button type="button" disabled={!child.perms.album} onClick={() => { void saveCopies([photoId]); toast.success('Saved to your device with your watermark') }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-navy text-sm font-bold text-white disabled:opacity-40"><Download className="size-4" />Download</button>
               <button type="button" disabled={!child.perms.album} onClick={() => { shareLink(photoId); toast.success('Family link created · expires in 7 days') }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-white text-sm font-bold disabled:opacity-40"><Link2 className="size-4" />Share link</button>
               <button type="button" onClick={() => { const id = fileCase({ kind: 'Wrong face', studentId: childId, photoId, text: 'This is not my child / wrong face tagged.' }); toast.success(`Sent to school review · ${id}`) }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-white text-sm font-bold"><Flag className="size-4" />Wrong face</button>
               <button type="button" onClick={() => { const id = fileCase({ kind: 'Takedown', studentId: childId, photoId, text: 'Please take this photo down / stop using it.' }); toast.success(`Takedown requested · ${id}`) }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-risk/40 bg-white text-sm font-bold text-risk"><Trash2 className="size-4" />Ask to remove</button>

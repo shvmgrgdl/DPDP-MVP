@@ -10,6 +10,7 @@ const SCENES = [
   { title: 'Parent permission', line: 'Each guardian signs in with a school-issued ID — no name or phone number — and chooses, purpose by purpose: private album, inside school, website and social.' },
   { title: 'School review', line: 'Before anything goes public, every face is checked. One restricted child blocks the photo; an unknown face goes to a person.' },
   { title: 'Controlled sharing', line: 'Approved photos are released. Everything else stays in the private parent album, where each parent sees only their child.' },
+  { title: 'Protected & traceable', line: 'Photos and records are encrypted. Every photo on screen carries the viewer’s ID and the live time, so a leaked copy can be traced.' },
   { title: 'Evidence', line: 'Every choice, review and approval is recorded in order — so the school can show what was decided and why.' },
 ]
 const diyaOff = STUDENTS0.map((s) => (s.id === 'S2' ? { ...s, perms: { ...s.perms, public: false } } : s))
@@ -33,6 +34,11 @@ function Scene({ i }: { i: number }) {
       {[[PHOTOS0[1], 'Public · approved', 'ok'], [PHOTOS0[2], 'Parent album only', 'muted'], [PHOTOS0[0], 'Held for review', 'warn']].map(([p, l, t], k) => (
         <div key={k} className="pop" style={{ animationDelay: `${k * 1.5}s` }}><PhotoView photo={p as typeof PHOTOS0[0]} students={diyaOff} /><div className="mt-1.5"><Chip tone={t as 'ok'}>{t === 'ok' ? <Check className="size-3" /> : <Lock className="size-3" />}{l as string}</Chip></div></div>))}
     </div></div>)
+  if (i === 4) return (
+    <div className="grid size-full place-items-center bg-navy p-4"><div className="relative w-full max-w-2xl">
+      <PhotoView photo={PHOTOS0[1]} students={STUDENTS0} />
+      <div className="pop absolute left-3 top-3 flex gap-2" style={{ animationDelay: '1s' }}><Chip tone="ok"><Lock className="size-3" /> AES-256 encrypted</Chip><Chip tone="muted">TLS in transit</Chip></div>
+      <div className="pop absolute bottom-3 left-3 right-3 flex flex-wrap gap-2" style={{ animationDelay: '4s' }}><Chip tone="gold">Viewer ID · time · trace ID on every photo</Chip><Chip tone="muted">Every view logged</Chip></div></div></div>)
   return (
     <div className="grid size-full place-items-center bg-navy p-6 text-white"><div className="w-full max-w-md space-y-2">
       {['A guardian withdrew public use', 'Face 4 reviewed: not a student', 'Choir photo approved for website', 'Parent opened their child’s album'].map((t, k) => (
@@ -56,7 +62,7 @@ export function Story({ bare = false }: { bare?: boolean }) {
   )
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
-      <SectionTitle eyebrow="Explainer · 75 seconds" title="From school event to evidence" sub="Five scenes: school event → parent permission → school review → controlled sharing → evidence. Plays on loop at the booth." />
+      <SectionTitle eyebrow="Explainer · 90 seconds" title="From school event to evidence" sub="Five scenes: school event → parent permission → school review → controlled sharing → evidence. Plays on loop at the booth." />
       <div className="card overflow-hidden">
         <div className="relative aspect-video w-full overflow-hidden bg-navy">
           <style>{`@keyframes kb{from{transform:scale(1)}to{transform:scale(1.08)}}`}</style>
