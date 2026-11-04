@@ -2,6 +2,8 @@ import * as React from 'react'
 import { Download, WifiOff, LayoutGrid } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useDemo } from './store'
+import { ensureLocale } from './i18n'
+import { LangPicker } from './ui'
 import { Launcher } from './app/Launcher'
 import { ParentApp } from './app/ParentApp'
 import { AdminApp } from './app/AdminApp'
@@ -16,6 +18,7 @@ import { Pilot } from './screens/Pilot'
 import { Team } from './screens/Team'
 import { OnePager } from './screens/OnePager'
 import { GalleryApp } from './app/GalleryApp'
+import { t } from './i18n'
 
 const MARK = <svg viewBox="0 0 32 32" className="size-8"><rect width="32" height="32" rx="8" fill="#c8921a" /><path d="M16 6.5l8 3v6.2c0 5-3.4 8.6-8 10.3-4.6-1.7-8-5.3-8-10.3V9.5l8-3z" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" /><path d="M12.2 16.2l2.6 2.6 5-5.2" fill="none" stroke="#14213d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 
@@ -35,18 +38,18 @@ function Booth() {
     <div className="min-h-dvh">
       <header className="no-print sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-          <button type="button" onClick={() => go('home')} className="flex items-center gap-2 text-left" aria-label="Home">{MARK}<span className="leading-tight"><span className="block whitespace-nowrap text-sm font-bold">DPDPA for Schools</span><span className="block whitespace-nowrap text-[11px] text-ink-3">MediaGuard demo · DIDAC 2026</span></span></button>
-          <nav aria-label="Sections" className="order-3 -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 md:order-none md:mx-0 md:ml-auto md:w-auto md:px-0">
-            {ROUTES.map((r) => <button key={r.key} type="button" onClick={() => go(r.key)} className={`min-h-10 shrink-0 rounded-lg px-3 text-sm font-semibold ${route === r.key ? 'bg-navy text-white' : 'text-ink-2 hover:bg-sand'}`}>{r.label}</button>)}
+          <button type="button" onClick={() => go('home')} className="flex items-center gap-2 text-left" aria-label={t("Home")}>{MARK}<span className="leading-tight"><span className="block whitespace-nowrap text-sm font-bold">{t("DPDPA for Schools")}</span><span className="block whitespace-nowrap text-[11px] text-ink-3">{t("MediaGuard demo · DIDAC 2026")}</span></span></button>
+          <nav aria-label={t("Sections")} className="order-3 -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 md:order-none md:mx-0 md:ml-auto md:w-auto md:px-0">
+            {ROUTES.map((r) => <button key={r.key} type="button" onClick={() => go(r.key)} className={`min-h-10 shrink-0 rounded-lg px-3 text-sm font-semibold ${route === r.key ? 'bg-navy text-white' : 'text-ink-2 hover:bg-sand'}`}>{t(r.label)}</button>)}
           </nav>
-          <button type="button" onClick={() => useDemo.getState().setRole(null)} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-sm font-semibold"><LayoutGrid className="size-4" /> Apps</button>
-          {prompt && <button type="button" onClick={() => prompt.prompt()} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-gold px-3 text-sm font-semibold text-white"><Download className="size-4" /> Install</button>}
+          <LangPicker compact />
+          <button type="button" onClick={() => useDemo.getState().setRole(null)} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-sm font-semibold"><LayoutGrid className="size-4" /> {t("Apps")}</button>
+          {prompt && <button type="button" onClick={() => prompt.prompt()} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-gold px-3 text-sm font-semibold text-white"><Download className="size-4" /> {t("Install")}</button>}
         </div>
-        {offline && <div className="flex items-center justify-center gap-1.5 bg-gold-50 py-1 text-xs font-semibold text-gold"><WifiOff className="size-3.5" /> Offline — the demo still works</div>}
+        {offline && <div className="flex items-center justify-center gap-1.5 bg-gold-50 py-1 text-xs font-semibold text-gold"><WifiOff className="size-3.5" /> {t("Offline — the demo still works")}</div>}
       </header>
       <main>{page}</main>
-      <footer className="no-print border-t border-line px-4 py-6 text-center text-xs text-ink-3">
-        Prototype with synthetic data and a fictional school. Not legal advice, not a certification. <button type="button" className="underline" onClick={() => go('team')}>Team</button>
+      <footer className="no-print border-t border-line px-4 py-6 text-center text-xs text-ink-3">{t("Prototype with synthetic data and a fictional school. Not legal advice, not a certification.")} <button type="button" className="underline" onClick={() => go('team')}>{t("Team")}</button>
       </footer>
     </div>
   )
@@ -55,8 +58,12 @@ function Booth() {
 export default function App() {
   const role = useDemo((s) => s.role)
   const setRole = useDemo((s) => s.setRole)
+  const lang = useDemo((s) => s.lang)
+  const [, bump] = React.useState(0)
+  React.useEffect(() => { document.documentElement.lang = lang; void ensureLocale(lang).then(() => bump((x) => x + 1)) }, [lang])
   React.useEffect(() => {
-    const r = new URLSearchParams(location.search).get('role')
+    const q = new URLSearchParams(location.search); const r = q.get('role'); const lg = q.get('lang')
+    if (lg && /^(en|hi|bn|mr|gu|ta|te|kn|pa|ml)$/.test(lg)) useDemo.getState().setLang(lg as never)
     if (r === 'parent' || r === 'admin' || r === 'photographer' || r === 'gallery' || r === 'booth') setRole(r)
   }, [setRole])
   if (location.hash.startsWith('#/cinema')) return <Story bare />

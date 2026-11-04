@@ -15,7 +15,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'media/*.jpg', 'video/*.mp4'],
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,woff2,mp4}'], navigateFallback: 'index.html', maximumFileSizeToCacheInBytes: 12_000_000 },
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,woff2,mp4}'], globIgnores: ['video/mediaguard-explainer-!(en).mp4'], navigateFallback: 'index.html', maximumFileSizeToCacheInBytes: 12_000_000 },
       manifest: {
         name: 'DPDPA for Schools · MediaGuard demo',
         short_name: 'MediaGuard',

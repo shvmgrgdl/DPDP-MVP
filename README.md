@@ -56,4 +56,4 @@ Vite · React 19 · TypeScript (strict) · Tailwind v4 · Radix · zustand (+Ind
 
 ## DIDAC booth demo (PWA)
 
-A second, installable app lives in `didac/` — see [docs/DIDAC.md](docs/DIDAC.md).
+A second, installable app lives in `didac/` (parent, admin, gallery and photographer apps in 10 Indian languages, with encryption/watermark/audit demo) — see [docs/DIDAC.md](docs/DIDAC.md).

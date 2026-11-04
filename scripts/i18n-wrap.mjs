@@ -3,9 +3,10 @@
 import fs from 'fs'; import path from 'path'
 import { parse } from '@babel/parser'
 const root = 'didac/src'
-const files = []; const walk = (d) => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); fs.statSync(p).isDirectory() ? (f !== 'locales' && walk(p)) : /\.tsx$/.test(f) && files.push(p) } }; walk(root)
+const files = []; const walk = (d) => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); fs.statSync(p).isDirectory() ? (f !== 'locales' && walk(p)) : (/\.tsx$/.test(f) || f === 'data.ts') && files.push(p) } }; walk(root)
 const keys = new Set(); const hints = {}
-const ATTRS = new Set(['placeholder', 'aria-label', 'title', 'alt', 'label'])
+const ATTRS = new Set(['placeholder', 'aria-label', 'title', 'alt', 'label', 'eyebrow', 'sub'])
+const PROPS = new Set(['title', 'body', 'line', 'cta', 'label', 'example', 'q', 'a', 'topic', 'control', 'status', 'desc'])
 const hasLetters = (s) => /\p{L}/u.test(s)
 const dec = (s) => s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
 const q = (s) => JSON.stringify(s)
@@ -30,12 +31,23 @@ for (const file of files) {
         if (!e) return
         if (e.type === 'StringLiteral' && hasLetters(e.value)) wrapLit(e, e.value)
         else if (e.type === 'TemplateLiteral' && e.expressions.length === 0 && hasLetters(e.quasis[0].value.cooked)) wrapLit(e, e.quasis[0].value.cooked)
+        else if (e.type === 'TemplateLiteral' && e.expressions.length && hasLetters(e.quasis.map((x) => x.value.cooked).join(''))) { let tpl = ''; e.quasis.forEach((qq, i) => { tpl += qq.value.cooked + (i < e.expressions.length ? `{${i}}` : '') }); keys.add(tpl); edits.push({ start: e.start, end: e.end, text: `t(${q(tpl)}, { ${e.expressions.map((x, i) => `${i}: ${src.slice(x.start, x.end)}`).join(', ')} })` }) }
         else if (e.type === 'ConditionalExpression') { walkExpr(e.consequent); walkExpr(e.alternate) }
         else if (e.type === 'LogicalExpression') walkExpr(e.right)
         else if (e.type === 'ParenthesizedExpression') walkExpr(e.expression)
       }
       walkExpr(n.expression)
     }
+    if (n.type === 'JSXAttribute' && n.value?.type === 'JSXExpressionContainer' && ATTRS.has(n.name.name) && n.value.expression.type === 'TemplateLiteral' && n.value.expression.expressions.length) {
+      const e = n.value.expression; let tpl = ''; e.quasis.forEach((qq, i) => { tpl += qq.value.cooked + (i < e.expressions.length ? `{${i}}` : '') })
+      if (hasLetters(tpl.replace(/\{\d+\}/g, ''))) { keys.add(tpl); edits.push({ start: e.start, end: e.end, text: `t(${q(tpl)}, { ${e.expressions.map((x, i) => `${i}: ${src.slice(x.start, x.end)}`).join(', ')} })` }); return }
+    }
+    // identity-tag strings that live in arrays / data tables so they can be extracted and translated at render
+    if (n.type === 'ArrayExpression' && !(parent && parent.type === 'JSXExpressionContainer')) {
+      const tag = (x) => { if (!x) return; if (x.type === 'StringLiteral' && hasLetters(x.value) && x.value.length > 2 && /[\s\p{Lu}]/u.test(x.value)) { keys.add(x.value); edits.push({ start: x.start, end: x.end, text: `tx(${q(x.value)})` }) } else if (x.type === 'ArrayExpression') x.elements.forEach(tag) }
+      if (n.elements.some((x) => x && (x.type === 'StringLiteral' || x.type === 'ArrayExpression'))) n.elements.forEach(tag)
+    }
+    if (n.type === 'ObjectProperty' && !n.computed && n.key && PROPS.has(n.key.name ?? n.key.value) && n.value.type === 'StringLiteral' && hasLetters(n.value.value) && n.value.value.length > 2) { keys.add(n.value.value); edits.push({ start: n.value.start, end: n.value.end, text: `tx(${q(n.value.value)})` }) }
     if (n.type === 'CallExpression') {
       const c = n.callee; const name = c.type === 'Identifier' ? c.name : c.type === 'MemberExpression' && c.object.name === 'toast' ? 'toast' : ''
       if ((name === 'toast' || name === 'confirm') && n.arguments[0]) {
@@ -62,7 +74,8 @@ for (const file of files) {
   const kept = []; for (const e of edits) { const last = kept[kept.length - 1]; if (!last || e.start >= last.end) kept.push(e) }
   for (const e of kept.reverse()) src = src.slice(0, e.start) + e.text + src.slice(e.end)
   if (src !== orig) {
-    if (!/import \{[^}]*\bt\b[^}]*\} from '[^']*i18n'/.test(src)) {
+    if (/\btx\(/.test(src) && !/\btx\b[^;\n]*from '[^']*i18n'/.test(src) && !/export const tx\b/.test(src)) { const rel2 = path.relative(path.dirname(file), path.join(root, 'i18n')).replace(/\\/g, '/'); src = `import { tx } from '${rel2.startsWith('.') ? rel2 : './' + rel2}'\n` + src }
+    if (/\bt\(/.test(src) && !/import \{[^}]*\bt\b[^}]*\} from '[^']*i18n'/.test(src) && !/from '\.\/i18n'/.test(src.split('\n').slice(0,3).join('\n'))) {
       const rel = path.relative(path.dirname(file), path.join(root, 'i18n')).replace(/\\/g, '/'); const imp = `import { t } from '${rel.startsWith('.') ? rel : './' + rel}'\n`
       const m = [...src.matchAll(/^import .*$/gm)].pop(); const at = m ? m.index + m[0].length + 1 : 0; src = src.slice(0, at) + imp + src.slice(at)
     }

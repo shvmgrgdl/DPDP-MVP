@@ -3,8 +3,11 @@ import { cn } from '@/lib/utils'
 import type { Evaluation, Photo, Student } from './data'
 import { STATE_META } from './data'
 import { useDemo } from './store'
+import { LANGS, type Lang } from './i18n'
+import { Languages } from 'lucide-react'
 import { useNow } from './lib/useNow'
 import { traceId } from './lib/fake'
+import { t } from './i18n'
 
 export const pub = (p: string) => p
 
@@ -15,7 +18,7 @@ const tones: Record<Tone, string> = {
 export function Chip({ tone = 'muted', children, className }: { tone?: Tone; children: React.ReactNode; className?: string }) {
   return <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold', tones[tone], className)}>{children}</span>
 }
-export const StateChip = ({ ev }: { ev: Evaluation }) => <Chip tone={STATE_META[ev.state].tone}>{STATE_META[ev.state].label}</Chip>
+export const StateChip = ({ ev }: { ev: Evaluation }) => <Chip tone={STATE_META[ev.state].tone}>{t(STATE_META[ev.state].label)}</Chip>
 
 export function Btn({ variant = 'navy', className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'navy' | 'gold' | 'ghost' | 'outline' }) {
   const v = { navy: 'bg-navy text-white hover:bg-navy-2', gold: 'bg-gold text-white hover:brightness-95', ghost: 'text-ink-2 hover:bg-sand', outline: 'border border-line-strong border-[#d6cdb8] bg-white text-ink hover:bg-sand' }[variant]
@@ -29,7 +32,7 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
     </button>
   )
 }
-export const ProtoTag = ({ className }: { className?: string }) => <Chip tone="gold" className={className}>Prototype · synthetic data</Chip>
+export const ProtoTag = ({ className }: { className?: string }) => <Chip tone="gold" className={className}>{t("Prototype · synthetic data")}</Chip>
 
 export const SectionTitle = ({ eyebrow, title, sub }: { eyebrow?: string; title: string; sub?: string }) => (
   <div className="mb-6">
@@ -46,7 +49,7 @@ export function PhotoView({ photo, students, mode = 'plain', ev, blurRestricted,
 }) {
   return (
     <div className={cn('relative w-full overflow-hidden rounded-xl bg-sand', className)} style={{ aspectRatio: `${photo.w} / ${photo.h}` }}>
-      <img src={pub(photo.src)} alt={photo.title} className="absolute inset-0 size-full select-none object-cover [-webkit-touch-callout:none]" draggable={false} onContextMenu={(e) => e.preventDefault()} />
+      <img src={pub(photo.src)} alt={t(photo.title)} className="absolute inset-0 size-full select-none object-cover [-webkit-touch-callout:none]" draggable={false} onContextMenu={(e) => e.preventDefault()} />
       {watermark && <Watermark photoId={photo.id} />}
       {photo.faces.map((f, i) => {
         const st = students.find((s) => s.id === f.studentId)
@@ -58,9 +61,9 @@ export function PhotoView({ photo, students, mode = 'plain', ev, blurRestricted,
         const mine = !!highlightId && st?.id === highlightId
         const blur = (mode === 'parent' && !mine) || (mode === 'admin' && blurRestricted && (restricted || unknown))
         const ring = mode === 'admin' ? (restricted ? 'ring-risk' : unknown ? 'ring-[#e8a317]' : f.adult ? 'ring-info' : 'ring-ok') : mine ? 'ring-gold' : 'ring-transparent'
-        const label = f.adult ? 'Adult' : st ? st.name.split(' ')[0] : 'Unknown'
+        const label = f.adult ? t('Adult') : st ? st.name.split(' ')[0] : t('Unknown')
         return (
-          <button key={i} type="button" disabled={!onFaceClick} onClick={() => onFaceClick?.(i)} style={style} aria-label={`Face ${i + 1}: ${label}`}
+          <button key={i} type="button" disabled={!onFaceClick} onClick={() => onFaceClick?.(i)} style={style} aria-label={t("Face {0}: {1}", { 0: i + 1, 1: label })}
             className={cn('absolute rounded-lg ring-2 transition', ring, blur && 'backdrop-blur-xl bg-white/20', selected === i && 'ring-4 ring-gold', !onFaceClick && 'pointer-events-none')}>
             {mode === 'admin' && !blur && <span className={cn('absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white', restricted ? 'bg-risk' : unknown ? 'bg-[#b87a00]' : f.adult ? 'bg-info' : 'bg-ok')}>{label}</span>}
             {mode === 'admin' && blur && <span className="absolute inset-0 grid place-items-center text-[10px] font-bold text-white drop-shadow">{label}</span>}
@@ -71,8 +74,10 @@ export function PhotoView({ photo, students, mode = 'plain', ev, blurRestricted,
   )
 }
 
-export const fmtT = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-export const fmtD = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+/** Locale for dates: the chosen language with Western numerals, so IDs and times read the same everywhere. */
+const loc = () => `${useDemo.getState().lang}-IN-u-nu-latn`
+export const fmtT = (iso: string) => new Date(iso).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+export const fmtD = (iso: string) => new Date(iso).toLocaleString(loc(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 /** Who is looking right now — school-issued ID or role, never a personal name. */
 export const viewerLabelOf = (s: ReturnType<typeof useDemo.getState>) => s.role === 'photographer' ? 'Photographer' : s.viewer === 'parent' || s.role === 'parent' ? `Guardian ${s.accounts[s.session ?? s.childId]?.id ?? ''}`.trim() : s.viewer === 'admin' || s.role === 'admin' ? 'School admin' : 'Gallery viewer'
@@ -85,9 +90,34 @@ export function Watermark({ photoId }: { photoId: string }) {
   const text = `${who} · ${wmTime(now)} · ${traceId(who, photoId)}`
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 select-none overflow-hidden" style={{ containerType: 'inline-size' }}>
-      <div className="absolute -inset-[40%] flex -rotate-[24deg] flex-col justify-center gap-[7cqw]" style={{ fontSize: '2.6cqw' }}>
-        {Array.from({ length: 9 }, (_, r) => <div key={r} className="flex gap-[6cqw] whitespace-nowrap font-semibold text-white/55" style={{ textShadow: '0 0 3px rgba(0,0,0,.55)', marginLeft: r % 2 ? '-14cqw' : 0 }}>{Array.from({ length: 4 }, (_, c) => <span key={c}>{text}</span>)}</div>)}
+      <div className="absolute left-[2cqw] top-[2cqw] rounded bg-black/45 px-[1.2cqw] py-[0.4cqw] font-bold text-white" style={{ fontSize: '2.4cqw' }}>{text}</div>
+      <div className="absolute bottom-[2cqw] right-[2cqw] rounded bg-black/45 px-[1.2cqw] py-[0.4cqw] font-bold text-white" style={{ fontSize: '2.4cqw' }}>{text}</div>
+      <div className="absolute -inset-[40%] flex -rotate-[24deg] flex-col justify-center gap-[5cqw]" style={{ fontSize: '2.6cqw' }}>
+        {Array.from({ length: 12 }, (_, r) => <div key={r} className="flex gap-[6cqw] whitespace-nowrap font-semibold text-white/55" style={{ textShadow: '0 0 3px rgba(0,0,0,.55)', marginLeft: r % 2 ? '-14cqw' : 0 }}>{Array.from({ length: 4 }, (_, c) => <span key={c}>{text}</span>)}</div>)}
       </div>
+    </div>
+  )
+}
+
+/** Language switcher shown in every app. Names are written in their own script. */
+export function LangPicker({ compact = false, dark = false }: { compact?: boolean; dark?: boolean }) {
+  const lang = useDemo((s) => s.lang); const setLang = useDemo((s) => s.setLang)
+  return (
+    <label className={cn('relative inline-flex items-center gap-1.5 rounded-full border px-3 text-xs font-bold', compact ? 'h-9' : 'h-10', dark ? 'border-white/25 bg-white/10 text-white' : 'border-line bg-white text-ink')}>
+      <Languages className="size-3.5 shrink-0" />
+      <select aria-label={t("Language")} value={lang} onChange={(e) => setLang(e.target.value as Lang)} className="max-w-[7.5rem] cursor-pointer appearance-none bg-transparent pr-1 outline-none">
+        {LANGS.map((l) => <option key={l.code} value={l.code} className="text-ink">{l.name}</option>)}
+      </select>
+    </label>
+  )
+}
+
+/** Any plain photo (thumbnails, examples) goes through here so it always carries the viewer ID and live time. */
+export function WmImg({ src, id, className, alt = '' }: { src: string; id: string; className?: string; alt?: string }) {
+  return (
+    <div className={cn('relative overflow-hidden', className)}>
+      <img src={src} alt={alt} className="size-full select-none object-cover [-webkit-touch-callout:none]" draggable={false} onContextMenu={(e) => e.preventDefault()} />
+      <Watermark photoId={id} />
     </div>
   )
 }

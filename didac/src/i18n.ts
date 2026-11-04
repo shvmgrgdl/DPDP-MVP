@@ -16,7 +16,9 @@ export async function ensureLocale(l: Lang) {
 declare global { interface Window { __missing?: Set<string> } }
 
 /** Translate an English string (the key). `{name}` placeholders are filled from vars. Falls back to English. */
-export function t(key: string, vars?: Record<string | number, string | number>): string {
+export function t(k: unknown, vars?: Record<string | number, string | number>): string {
+  if (k == null) return ''
+  const key = String(k)
   const lang = useDemo.getState().lang
   let s = key
   if (lang !== 'en') {
@@ -25,3 +27,10 @@ export function t(key: string, vars?: Record<string | number, string | number>):
   }
   return vars ? s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? String(vars[k]) : `{${k}}`)) : s
 }
+
+/** Identity marker: tags an English string held in data so the extractor finds it; render it with t(). */
+export const tx = <T extends string>(s: T): T => s
+
+/** Audit entries: actors are IDs/roles, details are stored as English plus an optional template for translation. */
+export const tActor = (a: string) => (a.startsWith('Guardian ') ? `${t('Guardian')} ${a.slice(9)}` : t(a))
+export const tDetail = (e: { detail: string; dt?: string; dv?: (string | number)[] }) => (e.dt ? t(e.dt, Object.fromEntries((e.dv ?? []).map((v, i) => [i, v]))) : e.detail)

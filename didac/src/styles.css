@@ -1,9 +1,25 @@
 @import "tailwindcss";
 @import "@fontsource-variable/dm-sans";
+@import "@fontsource/noto-sans-devanagari/400.css";
+@import "@fontsource/noto-sans-devanagari/700.css";
+@import "@fontsource/noto-sans-bengali/400.css";
+@import "@fontsource/noto-sans-bengali/700.css";
+@import "@fontsource/noto-sans-gujarati/400.css";
+@import "@fontsource/noto-sans-gujarati/700.css";
+@import "@fontsource/noto-sans-tamil/400.css";
+@import "@fontsource/noto-sans-tamil/700.css";
+@import "@fontsource/noto-sans-telugu/400.css";
+@import "@fontsource/noto-sans-telugu/700.css";
+@import "@fontsource/noto-sans-kannada/400.css";
+@import "@fontsource/noto-sans-kannada/700.css";
+@import "@fontsource/noto-sans-gurmukhi/400.css";
+@import "@fontsource/noto-sans-gurmukhi/700.css";
+@import "@fontsource/noto-sans-malayalam/400.css";
+@import "@fontsource/noto-sans-malayalam/700.css";
 
 /* DPDPA for Schools — warm paper, navy, gold, DM Sans */
 @theme {
-  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans Variable", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Gujarati", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Gurmukhi", "Noto Sans Malayalam", ui-sans-serif, system-ui, sans-serif;
   --color-paper: #faf6ee;
   --color-card: #ffffff;
   --color-sand: #f1ebdd;
