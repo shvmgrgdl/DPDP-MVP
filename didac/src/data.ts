@@ -5,19 +5,20 @@ export const PURPOSES: { key: Purpose; label: string; labelHi: string; example: 
   { key: 'public', label: 'Website & social media', labelHi: 'वेबसाइट और सोशल मीडिया', example: 'School website, Instagram, Facebook, YouTube.' },
 ]
 
-export interface Student { id: string; name: string; cls: string; guardian: string; perms: Record<Purpose, boolean> }
+export interface Student { id: string; name: string; cls: string; guardian: string; admNo: string; perms: Record<Purpose, boolean>; onboarded: boolean; askEach?: boolean; approvals: string[]; consentAt?: string }
 export const STUDENTS0: Student[] = [
-  { id: 'S1', name: 'Kabir Mehta', cls: '5B', guardian: 'Rhea Mehta', perms: { album: true, internal: true, public: true } },
-  { id: 'S2', name: 'Diya Sharma', cls: '5B', guardian: 'Anita Sharma', perms: { album: true, internal: true, public: true } },
-  { id: 'S3', name: 'Aryan Verma', cls: '5B', guardian: 'Sanjay Verma', perms: { album: true, internal: true, public: true } },
-  { id: 'S4', name: 'Meera Iyer', cls: '5A', guardian: 'Lakshmi Iyer', perms: { album: true, internal: true, public: true } },
+  { id: 'S1', name: 'Kabir Mehta', cls: '5B', guardian: 'Rhea Mehta', admNo: 'ADM-2291', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
+  // Diya's guardian has not yet set choices: fail closed until she completes the parent app onboarding.
+  { id: 'S2', name: 'Diya Sharma', cls: '5B', guardian: 'Anita Sharma', admNo: 'ADM-2304', perms: { album: false, internal: false, public: false }, onboarded: false, approvals: [] },
+  { id: 'S3', name: 'Aryan Verma', cls: '5B', guardian: 'Sanjay Verma', admNo: 'ADM-2317', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
+  { id: 'S4', name: 'Meera Iyer', cls: '5A', guardian: 'Lakshmi Iyer', admNo: 'ADM-1988', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
 ]
 
 export interface Face { box: [number, number, number, number]; studentId: string | null; adult?: boolean }
 export interface Photo { id: string; src: string; w: number; h: number; title: string; faces: Face[]; uploadedBy: string }
 
 /** Face boxes are real, precomputed offline detections from the main demo's media manifest. Identities are assigned for the demo story. */
-export const PHOTOS0: Photo[] = [
+export const PHOTOS_BASE: Photo[] = [
   {
     id: 'P1', src: 'media/annual-day-08.jpg', w: 1100, h: 733, title: 'Annual Day · drama act (group)', uploadedBy: 'Photographer · Studio Lens',
     faces: [
@@ -30,11 +31,19 @@ export const PHOTOS0: Photo[] = [
   { id: 'P2', src: 'media/annual-day-05.jpg', w: 1100, h: 733, title: 'Annual Day · choir performance', uploadedBy: 'Photographer · Studio Lens', faces: [{ box: [0.404, 0.1324, 0.1474, 0.2945], studentId: 'S4' }] },
   { id: 'P3', src: 'media/annual-day-16.jpg', w: 1100, h: 733, title: 'Annual Day · curtain call', uploadedBy: 'Photographer · Studio Lens', faces: [{ box: [0.3808, 0.2938, 0.1847, 0.3099], studentId: 'S2' }] },
 ]
+export const MORE_PHOTOS: Photo[] = [
+  { id: 'P5', src: 'media/annual-day-03.jpg', w: 1100, h: 1649, title: 'Annual Day · opening ceremony', uploadedBy: 'Photographer · Studio Lens', faces: [{ box: [0.4471, 0.42, 0.0905, 0.0812], studentId: 'S2' }] },
+  { id: 'P6', src: 'media/annual-day-12.jpg', w: 1100, h: 1650, title: 'Annual Day · welcome song', uploadedBy: 'Photographer · Studio Lens', faces: [
+    { box: [0.7548, 0.3851, 0.0423, 0.0406], studentId: 'S4' }, { box: [0.4787, 0.3603, 0.0635, 0.0689], studentId: 'S3' },
+    { box: [0.2972, 0.2289, 0.0663, 0.09], studentId: 'S2' }, { box: [0.1224, 0.4647, 0.0386, 0.0437], studentId: null }, { box: [0.5253, 0.1847, 0.06, 0.0824], studentId: 'S1' }] },
+]
 /** Added by the "Photographer uploads new batch" action. */
 export const UPLOAD_PHOTO: Photo = {
   id: 'P4', src: 'media/annual-day-15.jpg', w: 1100, h: 733, title: 'Annual Day · group photo (new upload)', uploadedBy: 'Photographer · Studio Lens',
   faces: [{ box: [0.5719, 0.2919, 0.0819, 0.178], studentId: null }],
 }
+
+export const PHOTOS0: Photo[] = [...PHOTOS_BASE, ...MORE_PHOTOS]
 
 export type PhotoState = 'published' | 'takedown' | 'blocked' | 'review' | 'eligible'
 export interface Evaluation { state: PhotoState; restricted: Student[]; unknown: number; people: (Student | null)[]; reasons: string[] }
@@ -43,10 +52,11 @@ export interface Evaluation { state: PhotoState; restricted: Student[]; unknown:
 export function evaluate(p: Photo, students: Student[], published: boolean): Evaluation {
   const by = (id: string | null) => students.find((s) => s.id === id) ?? null
   const people = p.faces.map((f) => (f.adult ? null : by(f.studentId)))
-  const restricted = p.faces.map((f) => (f.adult ? null : by(f.studentId))).filter((s): s is Student => !!s && !s.perms.public)
+  const allowed = (s: Student) => s.perms.public || s.approvals.includes(p.id)
+  const restricted = p.faces.map((f) => (f.adult ? null : by(f.studentId))).filter((s): s is Student => !!s && !allowed(s))
   const unknown = p.faces.filter((f) => !f.adult && !f.studentId).length
   const reasons: string[] = []
-  restricted.forEach((s) => reasons.push(`${s.name}'s guardian has not allowed website & social media`))
+  restricted.forEach((s) => reasons.push(s.onboarded ? `${s.name}'s guardian has not allowed website & social media${s.askEach ? ' (asks each time)' : ''}` : `${s.name}'s guardian has not set choices yet`))
   if (unknown) reasons.push(`${unknown} face${unknown > 1 ? 's' : ''} not matched to a student — needs human review`)
   let state: PhotoState = restricted.length ? 'blocked' : unknown ? 'review' : 'eligible'
   if (published) state = restricted.length ? 'takedown' : 'published'

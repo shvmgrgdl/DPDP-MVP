@@ -49,7 +49,7 @@ export function PhotoView({ photo, students, mode = 'plain', ev, blurRestricted,
         const [x, y, w, h] = f.box
         const pad = 0.12
         const style: React.CSSProperties = { left: `${(x - w * pad) * 100}%`, top: `${(y - h * pad) * 100}%`, width: `${w * (1 + 2 * pad) * 100}%`, height: `${h * (1 + 2 * pad) * 100}%` }
-        const restricted = !!st && !st.perms.public
+        const restricted = !!st && !(st.perms.public || st.approvals.includes(photo.id))
         const unknown = !st && !f.adult
         const mine = !!highlightId && st?.id === highlightId
         const blur = (mode === 'parent' && !mine) || (mode === 'admin' && blurRestricted && (restricted || unknown))

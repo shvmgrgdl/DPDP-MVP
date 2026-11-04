@@ -1,5 +1,11 @@
 import * as React from 'react'
-import { Download, WifiOff } from 'lucide-react'
+import { Download, WifiOff, LayoutGrid } from 'lucide-react'
+import { Toaster } from 'sonner'
+import { useDemo } from './store'
+import { Launcher } from './app/Launcher'
+import { ParentApp } from './app/ParentApp'
+import { AdminApp } from './app/AdminApp'
+import { PhotographerApp } from './app/PhotographerApp'
 import { current, go, ROUTES, type Route } from './nav'
 import { Home } from './screens/Home'
 import { Story } from './screens/Story'
@@ -9,7 +15,7 @@ import { Pilot, Leads } from './screens/Pilot'
 
 const MARK = <svg viewBox="0 0 32 32" className="size-8"><rect width="32" height="32" rx="8" fill="#c8921a" /><path d="M16 6.5l8 3v6.2c0 5-3.4 8.6-8 10.3-4.6-1.7-8-5.3-8-10.3V9.5l8-3z" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" /><path d="M12.2 16.2l2.6 2.6 5-5.2" fill="none" stroke="#14213d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 
-export default function App() {
+function Booth() {
   const [route, setRoute] = React.useState<Route>(current())
   const [offline, setOffline] = React.useState(!navigator.onLine)
   const [prompt, setPrompt] = React.useState<(Event & { prompt: () => void }) | null>(null)
@@ -28,6 +34,7 @@ export default function App() {
           <nav aria-label="Sections" className="order-3 -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 md:order-none md:mx-0 md:ml-auto md:w-auto md:px-0">
             {ROUTES.map((r) => <button key={r.key} type="button" onClick={() => go(r.key)} className={`min-h-10 shrink-0 rounded-lg px-3 text-sm font-semibold ${route === r.key ? 'bg-navy text-white' : 'text-ink-2 hover:bg-sand'}`}>{r.label}</button>)}
           </nav>
+          <button type="button" onClick={() => useDemo.getState().setRole(null)} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-sm font-semibold"><LayoutGrid className="size-4" /> Apps</button>
           {prompt && <button type="button" onClick={() => prompt.prompt()} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-gold px-3 text-sm font-semibold text-white"><Download className="size-4" /> Install</button>}
         </div>
         {offline && <div className="flex items-center justify-center gap-1.5 bg-gold-50 py-1 text-xs font-semibold text-gold"><WifiOff className="size-3.5" /> Offline — the demo still works</div>}
@@ -37,5 +44,24 @@ export default function App() {
         Prototype with synthetic data and a fictional school. Not legal advice, not a certification. <button type="button" className="underline" onClick={() => go('leads')}>Team</button>
       </footer>
     </div>
+  )
+}
+
+export default function App() {
+  const role = useDemo((s) => s.role)
+  const setRole = useDemo((s) => s.setRole)
+  React.useEffect(() => {
+    const r = new URLSearchParams(location.search).get('role')
+    if (r === 'parent' || r === 'admin' || r === 'photographer' || r === 'booth') setRole(r)
+  }, [setRole])
+  return (
+    <>
+      <Toaster position="top-center" richColors closeButton={false} />
+      {role === null && <Launcher />}
+      {role === 'parent' && <div className="min-h-dvh bg-sand md:grid md:place-items-center md:py-6"><ParentApp /></div>}
+      {role === 'admin' && <AdminApp />}
+      {role === 'photographer' && <div className="min-h-dvh bg-sand md:grid md:place-items-center md:py-6"><PhotographerApp /></div>}
+      {role === 'booth' && <Booth />}
+    </>
   )
 }

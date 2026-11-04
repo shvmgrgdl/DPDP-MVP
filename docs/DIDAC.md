@@ -1,5 +1,18 @@
 # DIDAC 2026 booth demo (PWA)
 
+**It opens as an app, not a website.** Launcher (after a splash) → pick who you are:
+
+| App | What the flow shows |
+| --- | --- |
+| **Parent app** (phone-first; device frame on laptops) | Welcome → verify (OTP, matched to admission record, relationship) → notice v1.2 (English/Hindi) → three consent screens, nothing pre-selected (private album · inside school · website & social: No / Ask me each time / Yes) → confirm → receipt with evidence ID → app: **Home**, **Photos** (multi-select, download, controlled share link, zoom with who-opened activity, "wrong face", "ask to remove"), **Inbox** (school approval requests, one-time allow/decline), **Choices** (change/withdraw, history), **More** (access/correction/erasure/grievance requests with case ID and due date, switch child, replay onboarding) |
+| **School admin** (laptop) | Review queue with fail-closed gate, "Ask guardian (one-time)", face review, permissions matrix (incl. "not set up"), privacy-request and approval inbox, hash-chained evidence |
+| **Photographer** | Event-limited upload → face detect → match → unknown held for review |
+| **Booth kit** | Pitch, 75 s story, guided demo, DPDP map, vs Pixevety, FAQs, pilot & QR, leads |
+
+State is shared: what a parent chooses changes what the admin can publish, instantly. Deep links: `?role=parent|admin|photographer|booth`.
+
+Derived from the DIDAC prep notes beyond the handwritten list: purpose-by-purpose consent (S.6), per-event "ask each time" policy, withdrawal with takedown task, guardian verification flagged for legal review, rights requests and grievance (S.11–13), event-limited vendor access, and the explicit limit that copies outside the managed workflow can't be recalled.
+
 Separate, installable app in `didac/`, reusing the main app's utilities (`@/lib/utils` hashing) and its precomputed face boxes. Prototype with synthetic children and a fictional school.
 
 ```bash

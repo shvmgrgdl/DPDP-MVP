@@ -1,12 +1,14 @@
 import * as React from 'react'
-import { X, Eye, ShieldAlert } from 'lucide-react'
+import { X, Eye, ShieldAlert, Download, Link2, Flag, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useDemo, verifyChain } from '../store'
 import { evaluate } from '../data'
 import { Chip, PhotoView, StateChip, fmtD } from '../ui'
 
 /** Photo zoom: who opened, when, and the audit trail — only events the managed workflow actually observed. */
 export function Zoom({ photoId, onClose }: { photoId: string; onClose: () => void }) {
-  const { photos, students, published, audit, viewer, childId } = useDemo()
+  const { photos, students, published, audit, viewer, childId, downloadPhotos, shareLink, fileCase } = useDemo()
+  const child = students.find((x) => x.id === childId)!
   const photo = photos.find((p) => p.id === photoId)!
   const ev = evaluate(photo, students, !!published[photoId])
   React.useEffect(() => { const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
@@ -23,7 +25,14 @@ export function Zoom({ photoId, onClose }: { photoId: string; onClose: () => voi
             <div><div className="eyebrow">Photo activity</div><div className="text-lg font-bold">Who opened it, when</div></div>
             <button type="button" aria-label="Close" onClick={onClose} className="grid size-10 place-items-center rounded-xl hover:bg-sand"><X className="size-5" /></button>
           </div>
-          <StateChip ev={ev} />
+          {viewer === 'parent' ? (
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" disabled={!child.perms.album} onClick={() => { downloadPhotos([photoId]); toast.success('Saved to your device') }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-navy text-sm font-bold text-white disabled:opacity-40"><Download className="size-4" />Download</button>
+              <button type="button" disabled={!child.perms.album} onClick={() => { shareLink(photoId); toast.success('Family link created · expires in 7 days') }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-white text-sm font-bold disabled:opacity-40"><Link2 className="size-4" />Share link</button>
+              <button type="button" onClick={() => { const id = fileCase({ kind: 'Wrong face', studentId: childId, photoId, text: 'This is not my child / wrong face tagged.' }); toast.success(`Sent to school review · ${id}`) }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-white text-sm font-bold"><Flag className="size-4" />Wrong face</button>
+              <button type="button" onClick={() => { const id = fileCase({ kind: 'Takedown', studentId: childId, photoId, text: 'Please take this photo down / stop using it.' }); toast.success(`Takedown requested · ${id}`) }} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-risk/40 bg-white text-sm font-bold text-risk"><Trash2 className="size-4" />Ask to remove</button>
+            </div>
+          ) : <StateChip ev={ev} />}
           <ol className="space-y-2">
             {trail.length === 0 && <li className="text-sm text-ink-3">No activity recorded yet.</li>}
             {trail.map((a) => (

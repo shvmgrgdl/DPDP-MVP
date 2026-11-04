@@ -1,11 +1,11 @@
 import * as React from 'react'
-import { Check, X, ListChecks, Table2, ScrollText, Upload, UserRoundCheck, Lock, ZoomIn } from 'lucide-react'
+import { Check, X, ListChecks, Table2, ScrollText, Upload, UserRoundCheck, Lock, ZoomIn, Inbox, Send } from 'lucide-react'
 import { useDemo, verifyChain } from '../store'
 import { evaluate, PURPOSES } from '../data'
 import { Btn, Chip, PhotoView, StateChip, fmtD } from '../ui'
 import { Zoom } from './Zoom'
 
-type Tab = 'queue' | 'perms' | 'evidence'
+type Tab = 'queue' | 'perms' | 'requests' | 'evidence'
 export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (id: string) => void }) {
   const [tab, setTab] = React.useState<Tab>('queue')
   React.useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<Tab>).detail); window.addEventListener('admin-tab', h); return () => window.removeEventListener('admin-tab', h) }, [])
@@ -15,7 +15,7 @@ export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (i
   const photo = s.photos.find((p) => p.id === focusPhoto) ?? s.photos[0]
   const ev = evaluate(photo, s.students, !!s.published[photo.id])
   const counts = s.photos.reduce((a, p) => { const k = evaluate(p, s.students, !!s.published[p.id]).state; a[k] = (a[k] ?? 0) + 1; return a }, {} as Record<string, number>)
-  const tabs: [Tab, string, React.ReactNode][] = [['queue', 'Review queue', <ListChecks key="a" className="size-4" />], ['perms', 'Permissions', <Table2 key="b" className="size-4" />], ['evidence', 'Evidence', <ScrollText key="c" className="size-4" />]]
+  const tabs: [Tab, string, React.ReactNode][] = [['queue', 'Review queue', <ListChecks key="a" className="size-4" />], ['perms', 'Permissions', <Table2 key="b" className="size-4" />], ['requests', `Requests${s.cases.filter((c) => c.status === 'open').length + s.requests.filter((r) => r.status === 'pending').length ? ' ·' + (s.cases.filter((c) => c.status === 'open').length + s.requests.filter((r) => r.status === 'pending').length) : ''}`, <Inbox key="r" className="size-4" />], ['evidence', 'Evidence', <ScrollText key="c" className="size-4" />]]
   const faceObj = face !== null ? photo.faces[face] : null
 
   return (
@@ -62,6 +62,7 @@ export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (i
                   <Btn variant="gold" disabled={ev.state !== 'eligible'} onClick={() => s.approve(photo.id)}><Check className="size-4" /> Approve for public use</Btn>
                   <Btn variant="outline" disabled={ev.state === 'published'} onClick={() => s.albumOnly(photo.id)}><Lock className="size-4" /> Keep to parent album</Btn>
                 </div>
+                {ev.restricted.length > 0 && !s.published[photo.id] && <div className="mt-2 flex flex-wrap gap-1.5">{ev.restricted.filter((r) => r.onboarded).map((r) => { const pend = s.requests.some((q) => q.photoId === photo.id && q.studentId === r.id && q.status === 'pending'); return <Btn key={r.id} variant="outline" className="min-h-9 px-2.5 text-xs" disabled={pend} onClick={() => s.askGuardian(photo.id, r.id)}><Send className="size-3.5" />{pend ? `Asked ${r.guardian.split(' ')[0]}` : `Ask ${r.guardian.split(' ')[0]} (one-time)`}</Btn> })}</div>}
                 {ev.state === 'blocked' && <p className="mt-2 text-xs text-ink-3">The publish button stays off while any depicted child is restricted — it cannot be overridden from this screen.</p>}
               </div>
               <div className="rounded-xl border border-line bg-white p-3">
@@ -89,11 +90,22 @@ export function Admin({ focusPhoto, onFocus }: { focusPhoto: string; onFocus: (i
             <tbody>{s.students.map((st) => (
               <tr key={st.id} className="border-t border-line">
                 <td className="py-2.5 font-semibold">{st.name} <span className="font-normal text-ink-3">· {st.cls}</span></td>
-                {PURPOSES.map((p) => <td key={p.key}>{st.perms[p.key] ? <Chip tone="ok"><Check className="size-3" /> Allowed</Chip> : <Chip tone="risk"><X className="size-3" /> Not allowed</Chip>}</td>)}
+                {PURPOSES.map((p) => <td key={p.key}>{!st.onboarded ? <Chip tone="warn">Not set up</Chip> : st.perms[p.key] ? <Chip tone="ok"><Check className="size-3" /> Allowed</Chip> : <Chip tone="risk"><X className="size-3" /> Not allowed</Chip>}</td>)}
                 <td className="text-ink-2">{st.guardian}</td>
               </tr>))}</tbody>
           </table>
           <p className="mt-3 text-xs text-ink-3">Choices come from guardians (see Parent view). Changes appear here instantly and re-evaluate every photo.</p>
+        </div>
+      )}
+
+      {tab === 'requests' && (
+        <div className="grid gap-4 p-4 md:grid-cols-2">
+          <div><div className="eyebrow mb-2">Parent privacy requests</div>
+            {s.cases.length === 0 && <p className="text-sm text-ink-3">None yet. Requests filed in the parent app appear here with an owner and due date.</p>}
+            <ul className="space-y-2">{s.cases.map((c) => <li key={c.id} className="rounded-xl border border-line bg-white p-3 text-sm"><div className="flex items-center justify-between gap-2"><b>{c.id} · {c.kind}</b><Chip tone={c.status === 'open' ? 'warn' : 'ok'}>{c.status}</Chip></div><div className="text-xs text-ink-2">{s.students.find((x) => x.id === c.studentId)?.name}{c.photoId ? ` · ${c.photoId}` : ''} — {c.text}</div><div className="mt-1 flex items-center justify-between text-xs text-ink-3"><span>Owner: Privacy contact · due {fmtD(c.due)}</span>{c.status === 'open' && <Btn variant="outline" className="min-h-8 px-2.5 text-xs" onClick={() => s.resolveCase(c.id)}>Mark resolved</Btn>}</div></li>)}</ul></div>
+          <div><div className="eyebrow mb-2">Guardian approval requests</div>
+            {s.requests.length === 0 && <p className="text-sm text-ink-3">None. Use “Ask guardian” on a blocked photo.</p>}
+            <ul className="space-y-2">{s.requests.map((r) => <li key={r.id} className="rounded-xl border border-line bg-white p-3 text-sm"><div className="flex items-center justify-between"><b>{s.students.find((x) => x.id === r.studentId)?.guardian}</b><Chip tone={r.status === 'pending' ? 'warn' : r.status === 'approved' ? 'ok' : 'risk'}>{r.status}</Chip></div><div className="text-xs text-ink-2">{r.photoId} · {r.channel} · sent {fmtD(r.at)}</div></li>)}</ul></div>
         </div>
       )}
 
