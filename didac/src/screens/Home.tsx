@@ -33,8 +33,8 @@ export function Home() {
         <div className="eyebrow mb-2">The gap, in three steps</div>
         <div className="grid gap-4 md:grid-cols-3">
           {[
-            [FileSearch, 'Media is where permission gets tested', 'Student photos are the most visible personal data a school handles — and the data most easily sent to a website, Instagram or a parent group.'],
-            [FolderSync, 'Consent and media live in different places', 'Permissions sit in a form or spreadsheet. Photos sit in Google Drive and WhatsApp. Nothing checks one against the other at the moment of sharing.'],
+            [FileSearch, 'Media is a gap in DPDP readiness', 'Student photos are among the most visible personal data a school handles, and the easiest to send to a website, Instagram or a parent group.'],
+            [FolderSync, 'Everyday tools don’t check permissions', 'WhatsApp and Google Drive move files — they don’t know what each guardian allowed. Permissions sit in a form or spreadsheet, apart from the photos.'],
             [ShieldCheck, 'We run the workflow, within clear limits', 'Check permissions, review exceptions, control managed sharing and keep an evidence trail. We can’t recall copies that leave the workflow — and we say so.'],
           ].map(([Icon, t, b], i) => { const I = Icon as typeof FileSearch; return (
             <div key={i} className="card p-5">
@@ -44,10 +44,11 @@ export function Home() {
               <p className="mt-1 text-sm text-ink-2">{b as string}</p>
             </div>) })}
         </div>
-        <div className="mt-8 card flex flex-wrap items-center justify-between gap-4 p-5">
-          <div><div className="font-bold">What we show at the booth</div><p className="text-sm text-ink-2">A prototype with synthetic children: web gallery, parent console on a phone, admin console on a laptop, photo activity trail, and an honest comparison.</p></div>
+        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gold/40 bg-gold-50 p-4 text-sm"><Chip tone="gold">Timing</Chip><span className="font-semibold text-ink">Schools should prepare ahead of the main DPDP provisions scheduled to take effect on 13 May 2027.</span><button type="button" onClick={() => go('law')} className="font-bold text-gold underline">See the DPDP map</button></div>
+        <div className="mt-4 card flex flex-wrap items-center justify-between gap-4 p-5">
+          <div><div className="font-bold">What you’ll see</div><p className="text-sm text-ink-2">A prototype with synthetic children: school gallery, parent app on a phone, admin console on a laptop, photo activity trail, and an honest comparison.</p></div>
           <div className="flex flex-wrap gap-2">
-            <Btn variant="outline" onClick={() => go('law')}>DPDP Act map</Btn><Btn variant="outline" onClick={() => go('compare')}>Versus Pixevety</Btn><Btn variant="outline" onClick={() => go('faq')}>FAQs</Btn>
+            <Btn variant="outline" onClick={() => go('onepager')}>One-pager</Btn><Btn variant="outline" onClick={() => go('law')}>DPDP Act map</Btn><Btn variant="outline" onClick={() => go('compare')}>Versus Pixevety</Btn><Btn variant="outline" onClick={() => go('faq')}>FAQs</Btn>
           </div>
         </div>
       </section>

@@ -14,8 +14,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png', 'media/*.jpg'],
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,woff2}'], navigateFallback: 'index.html', maximumFileSizeToCacheInBytes: 3_000_000 },
+      includeAssets: ['icons/*.png', 'media/*.jpg', 'video/*.mp4'],
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,woff2,mp4}'], navigateFallback: 'index.html', maximumFileSizeToCacheInBytes: 12_000_000 },
       manifest: {
         name: 'DPDPA for Schools · MediaGuard demo',
         short_name: 'MediaGuard',
@@ -26,6 +26,11 @@ export default defineConfig({
         orientation: "any",
         start_url: './',
         scope: './',
+        shortcuts: [
+          { name: 'Parent app', url: './?role=parent', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'School admin', url: './?role=admin', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Booth kit', url: './?role=booth', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+        ],
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },

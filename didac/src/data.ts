@@ -5,13 +5,15 @@ export const PURPOSES: { key: Purpose; label: string; labelHi: string; example: 
   { key: 'public', label: 'Website & social media', labelHi: 'वेबसाइट और सोशल मीडिया', example: 'School website, Instagram, Facebook, YouTube.' },
 ]
 
+/** Names are masked at source (first and last letter only). The platform never holds full names or parent contact details; the school keeps the ID → family link. */
+export const mask = (n: string) => n.split(' ').map((w) => (w.length <= 2 ? w[0] + '•' : w[0] + '•'.repeat(w.length - 2) + w[w.length - 1])).join(' ')
 export interface Student { id: string; name: string; cls: string; guardian: string; admNo: string; perms: Record<Purpose, boolean>; onboarded: boolean; askEach?: boolean; approvals: string[]; consentAt?: string }
 export const STUDENTS0: Student[] = [
-  { id: 'S1', name: 'Kabir Mehta', cls: '5B', guardian: 'Rhea Mehta', admNo: 'ADM-2291', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
-  // Diya's guardian has not yet set choices: fail closed until she completes the parent app onboarding.
-  { id: 'S2', name: 'Diya Sharma', cls: '5B', guardian: 'Anita Sharma', admNo: 'ADM-2304', perms: { album: false, internal: false, public: false }, onboarded: false, approvals: [] },
-  { id: 'S3', name: 'Aryan Verma', cls: '5B', guardian: 'Sanjay Verma', admNo: 'ADM-2317', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
-  { id: 'S4', name: 'Meera Iyer', cls: '5A', guardian: 'Lakshmi Iyer', admNo: 'ADM-1988', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
+  { id: 'S1', name: 'K•••r M•••a', cls: '5B', guardian: 'G-9M2X', admNo: 'ADM-••91', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
+  // This guardian has not yet set choices: fail closed until onboarding completes in the parent app.
+  { id: 'S2', name: 'D••a S••••a', cls: '5B', guardian: 'G-4K7Q', admNo: 'ADM-••04', perms: { album: false, internal: false, public: false }, onboarded: false, approvals: [] },
+  { id: 'S3', name: 'A•••n V•••a', cls: '5B', guardian: 'G-2T8V', admNo: 'ADM-••17', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
+  { id: 'S4', name: 'M•••a I••r', cls: '5A', guardian: 'G-6R5C', admNo: 'ADM-••88', perms: { album: true, internal: true, public: true }, onboarded: true, approvals: [] },
 ]
 
 export interface Face { box: [number, number, number, number]; studentId: string | null; adult?: boolean }
@@ -82,9 +84,10 @@ export type Status = 'Prototype' | 'Planned' | 'Service' | 'Not offered'
 export const LEGAL_MAP: { ref: string; topic: string; control: string; status: Status }[] = [
   { ref: 'S.5 · Rule 3', topic: 'Notice', control: 'Purpose-by-purpose guardian notice, versioned, in English and Hindi, with the school’s contact route.', status: 'Prototype' },
   { ref: 'S.6(1)–(3)', topic: 'Consent', control: 'Separate choices for private album, internal use, and website/social. Nothing pre-selected for public use.', status: 'Prototype' },
+  { ref: 'S.6(1)', topic: 'Data minimisation', control: 'Parents sign in with school-issued random IDs. No parent name, phone or email is held; student names are masked on screen. The school keeps the ID → family link.', status: 'Prototype' },
   { ref: 'S.6(4)–(6)', topic: 'Withdrawal', control: 'Guardian can change a choice as easily as they gave it; future school-managed sharing is restricted and live posts raise a takedown task.', status: 'Prototype' },
   { ref: 'S.6(10)', topic: 'Proof', control: 'Hash-chained record of notice version, choice, actor and time — available if a decision is questioned.', status: 'Prototype' },
-  { ref: 'S.9 · Rule 10', topic: 'Children', control: 'Guardian-led choices per child. Verifying the adult’s authority is a design item under legal review.', status: 'Planned' },
+  { ref: 'S.9 · Rule 10', topic: 'Children', control: 'Guardian-led choices per child. The school issues IDs only to verified guardians; how that verification is documented is under legal review.', status: 'Planned' },
   { ref: 'S.8(5) · Rule 6', topic: 'Security safeguards', control: 'Role-based access, activity logs, event-limited photographer access. Infrastructure to be assessed before real data.', status: 'Planned' },
   { ref: 'S.8(6) · Rule 7', topic: 'Breach response', control: 'Incident workflow and evidence support. The school and its counsel make the statutory notifications.', status: 'Service' },
   { ref: 'S.8(7)–(8)', topic: 'Erasure & retention', control: 'Album expiry and deletion queue for school-managed copies. Independent external copies cannot be recalled.', status: 'Planned' },
@@ -95,25 +98,37 @@ export const LEGAL_MAP: { ref: string; topic: string; control: string; status: S
 
 export const FAQS: { q: string; a: string }[] = [
   { q: 'How could a school be flagged under the DPDP Act?', a: 'A concern can arise from a parent’s complaint, a rights request that is not answered, a data incident, or a Board process — depending on the law and the facts. There is no guaranteed detection pipeline. What helps is being able to show, quickly, what was decided and why.' },
-  { q: 'What are the penalties — and which matter most?', a: 'Penalties are caps set after an enquiry, never an automatic amount per photo. Highest caps: failing to keep reasonable security safeguards (up to ₹250 crore), failing to notify a breach (up to ₹200 crore), and breaching children’s-data duties (up to ₹200 crore). Other duties carry lower caps. Counsel should advise on your school’s position.' },
+  { q: 'What are the penalties — and which matter most?', a: 'Penalties are caps set after an enquiry, never an automatic amount per photo, and the main provisions are scheduled to take effect on 13 May 2027. In priority order by cap: failing to keep reasonable security safeguards (up to ₹250 crore), failing to notify a breach (up to ₹200 crore), and breaching children’s-data duties (up to ₹200 crore). Other duties carry lower caps. Counsel should advise on your school’s position.' },
   { q: 'Is every school photo illegal without consent?', a: 'No blanket rule exists. The lawful basis, purpose, the child’s age, school-related exceptions and what has commenced all matter. Separately, parent-approved sharing is a sensible school policy, and this prototype shows how to run it.' },
   { q: 'Can you delete a photo already forwarded on WhatsApp?', a: 'No. We can restrict links and exports that go through the managed workflow. We cannot recall screenshots or independent copies.' },
   { q: 'Does the AI find every student in every group photo?', a: 'No. Matching can be incomplete or wrong, so anything unknown or low-confidence goes to a person. In this demo an unknown face blocks publishing until someone reviews it. Child-face matching also needs legal review before any real use.' },
   { q: 'Is this DPDP compliance or a government certification?', a: 'Neither. It is a scoped media-governance workflow. Wider school readiness — notices, vendor contracts, training, incidents — is a separate service.' },
   { q: 'What exactly is audited?', a: 'Permission versions, configured restrictions, approval decisions, and access and sharing events that actually happen inside the managed workflow. It cannot prove what happened outside it, such as who later leaked a copy.' },
   { q: 'Do you use facial recognition?', a: 'The prototype shows matching with a human fallback, using synthetic data. Any real deployment would start with manual tagging as an option and a legal review of child-face processing.' },
+  { q: 'Do you see parents’ names or phone numbers?', a: 'No — that is a design choice. Parents sign in with a random ID and password printed on a slip by the school. The link between an ID and a family stays in the school’s own records; the app holds no parent names, phone numbers or emails, and shows student names partly masked. The trade-off: we can’t reset a forgotten password — the school office reissues it.' },
   { q: 'What access do vendors and photographers get?', a: 'Event-limited upload access that expires. They never see parent choices of other events or the full roster.' },
   { q: 'What if a parent withdraws after we posted?', a: 'Future managed use is restricted immediately, and any live post is flagged for takedown. Copies already shared elsewhere can’t be recalled, so we say so up front.' },
   { q: 'What does a pilot cost, and how does it run?', a: 'Start with a free 15-minute workflow assessment and a synthetic walkthrough. A bounded remote pilot around one real event follows only after your lawful-basis, safeguarding and processor review. We’ll scope it with you.' },
 ]
 
+export const DIFFS = ['India-first notices and Hindi for guardians', 'WhatsApp-compatible school sharing', 'A simpler, lower-cost one-event pilot', 'Human-first review of uncertain faces', 'Faster setup with local school systems and photographers']
+
 export const COMPARE: { feature: string; px: string; mg: string; note?: string }[] = [
   { feature: 'Permission checked against every person in a group photo', px: 'Yes — public documentation describes restrictions applying when any relevant student restricts use.', mg: 'Shown in this prototype: one child’s “no public use” blocks the photo.' },
-  { feature: 'Unknown / unmatched faces', px: 'Documented: untagged students go to identification and review.', mg: 'Shown: unknown faces fail closed and go to a human review queue.' },
+  { feature: 'Unknown / unmatched faces', px: 'Documented: an untagged student can hold downloads until identification or review.', mg: 'Shown: unknown faces fail closed and go to a human review queue.' },
   { feature: 'Parent self-service choices', px: 'Yes — parents manage purpose-level permissions.', mg: 'Shown: purpose-by-purpose choices, English and Hindi.' },
-  { feature: 'Evidence of who decided what', px: 'Audit and consent records are described; export detail to confirm in a demo.', mg: 'Shown: hash-chained decision log with activity per photo.' },
+  { feature: 'Evidence of who decided what', px: 'Not verified publicly — export and audit-log detail to confirm in a vendor demo.', mg: 'Shown: hash-chained decision log with activity per photo.' },
   { feature: 'Staff mobile capture, archive import, SIS/ERP sync, SSO', px: 'Yes — established, with named integration partners.', mg: 'Not in this prototype. Not claimed.' },
   { feature: 'Track record', px: 'Founded 2012; claims 380+ schools (company claim, not audited); ISO 27001 claimed.', mg: 'No paid school deployment yet. This is a prototype.' },
   { feature: 'India-first workflow', px: 'India clients since 2022 (company history); current India footprint unverified.', mg: 'Designed around Indian school events, Hindi notices and WhatsApp-style sharing — to be validated with schools.' },
+  { feature: 'Face recognition boundary', px: 'Company states matching works inside one school’s gallery only.', mg: 'Designed the same way; child-face matching needs legal review and a manual alternative first.' },
   { feature: 'Reach after sharing', px: 'Hosted links can be withdrawn; downloaded copies cannot be recalled.', mg: 'Same boundary — we say it plainly.' },
 ]
+
+/** Demo credentials, as printed on the school's login slips. In a real deployment only salted hashes are stored, and the ID → family mapping stays in the school's own records. */
+export const ACCOUNTS0: Record<string, { id: string; temp: string; password: string; mustChange: boolean; failed: number; resets: number }> = {
+  S1: { id: 'G-9M2X', temp: 'cedar-lamp-352', password: 'cedar-lamp-352', mustChange: false, failed: 0, resets: 0 },
+  S2: { id: 'G-4K7Q', temp: 'maple-river-481', password: 'maple-river-481', mustChange: true, failed: 0, resets: 0 },
+  S3: { id: 'G-2T8V', temp: 'olive-moon-627', password: 'olive-moon-627', mustChange: false, failed: 0, resets: 0 },
+  S4: { id: 'G-6R5C', temp: 'coral-bell-914', password: 'coral-bell-914', mustChange: false, failed: 0, resets: 0 },
+}

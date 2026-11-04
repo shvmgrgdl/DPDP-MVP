@@ -1,31 +1,40 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { sha256 } from '@/lib/utils'
-import { PHOTOS0, STUDENTS0, UPLOAD_PHOTO, type Photo, type Purpose, type Student } from './data'
+import { ACCOUNTS0, PHOTOS0, STUDENTS0, UPLOAD_PHOTO, type Photo, type Purpose, type Student } from './data'
 
 export type Viewer = 'admin' | 'parent' | 'gallery'
-export type AppRole = 'parent' | 'admin' | 'photographer' | 'booth' | null
+export type AppRole = 'parent' | 'admin' | 'photographer' | 'gallery' | 'booth' | null
 export interface AuditEntry { n: number; t: string; actor: string; action: string; photoId?: string; detail: string; prev: string; hash: string }
 export interface Lead {
   id: string; at: string; name: string; school: string; role: string; city: string; phone: string
   q1: string; q2: string; q3: 'yes' | 'maybe' | 'no' | ''; optIn: boolean; source: string
   stage: 'new' | 'qualified' | 'demo' | 'proposal' | 'paid'
+  owner: string; nextMeeting: string; notes: string
 }
+export interface Settings { waNumber: string; eventTag: string; contactEmail: string; contactPhone: string; owners: string }
 export interface GuardianRequest { id: string; photoId: string; studentId: string; status: 'pending' | 'approved' | 'declined'; at: string; channel: string }
 export interface Case { id: string; kind: 'Access' | 'Correction' | 'Erasure' | 'Takedown' | 'Wrong face' | 'Grievance'; studentId: string; photoId?: string; text: string; status: 'open' | 'resolved'; at: string; due: string }
 export interface Share { id: string; photoId: string; link: string; expires: string; studentId: string }
+export type Account = (typeof ACCOUNTS0)[string]
 export type PermInput = Record<Purpose, boolean>
 
 interface State {
   students: Student[]; photos: Photo[]; published: Record<string, boolean>
   audit: AuditEntry[]; leads: Lead[]; visitors: number
   requests: GuardianRequest[]; cases: Case[]; shares: Share[]
+  accounts: Record<string, Account>; session: string | null
   role: AppRole; viewer: Viewer; childId: string; lang: 'en' | 'hi'
   setRole: (r: AppRole) => void
+  login: (id: string, pw: string) => 'ok' | 'bad' | 'locked'
+  signOut: () => void
+  signInAs: (sid: string) => void
+  changePassword: (sid: string, pw: string) => void
+  resetPassword: (sid: string) => string
   setViewer: (v: Viewer) => void; setChild: (id: string) => void; setLang: (l: 'en' | 'hi') => void
   setPerm: (sid: string, p: Purpose, v: boolean) => void
   setAskEach: (sid: string, v: boolean) => void
-  completeOnboarding: (sid: string, perms: PermInput, askEach: boolean, phone: string) => string
+  completeOnboarding: (sid: string, perms: PermInput, askEach: boolean) => string
   assignFace: (photoId: string, idx: number, to: string | 'adult') => void
   approve: (photoId: string) => void
   albumOnly: (photoId: string) => void
@@ -38,7 +47,11 @@ interface State {
   fileCase: (c: Omit<Case, 'id' | 'at' | 'due' | 'status'>) => string
   resolveCase: (id: string) => void
   resetDemo: () => void
-  addLead: (l: Omit<Lead, 'id' | 'at' | 'stage'>) => void
+  settings: Settings
+  setSettings: (p: Partial<Settings>) => void
+  markTakenDown: (photoId: string) => void
+  addLead: (l: Omit<Lead, 'id' | 'at' | 'stage' | 'owner' | 'nextMeeting' | 'notes'>) => void
+  updateLead: (id: string, p: Partial<Lead>) => void
   setStage: (id: string, s: Lead['stage']) => void
   addVisitor: () => void
   resetLeads: () => void
@@ -66,13 +79,13 @@ export function verifyChain(audit: AuditEntry[]) {
   return true
 }
 const seedAudit = () => append(append([], { actor: 'System', action: 'Workspace created', detail: 'Annual Day event workspace with synthetic roster (4 students).' }), { actor: 'Photographer · Studio Lens', action: 'Uploaded 5 photos', detail: 'Faces detected and matched to roster; unmatched faces held for review.' })
-const initial = () => ({ students: STUDENTS0, photos: PHOTOS0, published: {} as Record<string, boolean>, audit: seedAudit(), requests: [] as GuardianRequest[], cases: [] as Case[], shares: [] as Share[] })
-const guardianOf = (s: { students: Student[] }, sid: string) => { const st = s.students.find((x) => x.id === sid)!; return { st, actor: `Guardian · ${st.guardian}` } }
+const initial = () => ({ students: STUDENTS0, photos: PHOTOS0, published: {} as Record<string, boolean>, audit: seedAudit(), requests: [] as GuardianRequest[], cases: [] as Case[], shares: [] as Share[], accounts: ACCOUNTS0, session: null as string | null })
+const guardianOf = (s: { students: Student[] }, sid: string) => { const st = s.students.find((x) => x.id === sid)!; return { st, actor: `Guardian ${st.guardian}` } }
 
 export const useDemo = create<State>()(
   persist(
     (set, get) => ({
-      ...initial(), leads: [], visitors: 0, role: null, viewer: 'admin', childId: 'S2', lang: 'en',
+      ...initial(), leads: [], visitors: 0, settings: { waNumber: (import.meta.env.VITE_WA_NUMBER as string | undefined)?.replace(/\D/g, '') ?? '', eventTag: 'DIDAC 2026', contactEmail: '', contactPhone: '', owners: 'Shivam, Additya' }, role: null, viewer: 'admin', childId: 'S2', lang: 'en',
       setRole: (role) => set({ role }),
       setViewer: (viewer) => set({ viewer }),
       setChild: (childId) => set({ childId }),
@@ -86,10 +99,23 @@ export const useDemo = create<State>()(
         return { students, audit }
       }),
       setAskEach: (sid, v) => set((s) => ({ students: s.students.map((x) => (x.id === sid ? { ...x, askEach: v } : x)) })),
-      completeOnboarding: (sid, perms, askEach, phone) => {
+      login: (id, pw) => {
+        const s = get(); const sid = Object.keys(s.accounts).find((k) => s.accounts[k].id === id.trim().toUpperCase())
+        if (!sid) return 'bad'
+        const a = s.accounts[sid]
+        if (a.failed >= 5) return 'locked'
+        if (a.password !== pw) { set({ accounts: { ...s.accounts, [sid]: { ...a, failed: a.failed + 1 } } }); return a.failed + 1 >= 5 ? 'locked' : 'bad' }
+        set({ accounts: { ...s.accounts, [sid]: { ...a, failed: 0 } }, session: sid, childId: sid, audit: append(s.audit, { actor: `Guardian ${a.id}`, action: 'Signed in', detail: 'School-issued ID. No name or phone number is held by this app.' }) })
+        return 'ok'
+      },
+      signOut: () => set({ session: null }),
+      signInAs: (sid) => set((s) => ({ session: sid, childId: sid, accounts: { ...s.accounts, [sid]: { ...s.accounts[sid], mustChange: false } } })),
+      changePassword: (sid, pw) => set((s) => ({ accounts: { ...s.accounts, [sid]: { ...s.accounts[sid], password: pw, mustChange: false } }, audit: append(s.audit, { actor: `Guardian ${s.accounts[sid].id}`, action: 'Password changed', detail: 'Temporary password replaced at first sign-in.' }) })),
+      resetPassword: (sid) => { const s = get(); const w = ['maple', 'river', 'cedar', 'lamp', 'olive', 'moon', 'coral', 'bell', 'amber', 'pine']; const temp = `${w[Math.floor(Math.random() * 10)]}-${w[Math.floor(Math.random() * 10)]}-${100 + Math.floor(Math.random() * 900)}`; set({ accounts: { ...s.accounts, [sid]: { ...s.accounts[sid], temp, password: temp, mustChange: true, failed: 0, resets: s.accounts[sid].resets + 1 } }, audit: append(s.audit, { actor: 'School admin · Principal’s office', action: 'Login reissued', detail: `New temporary password issued for ${s.accounts[sid].id}; guardian must change it at next sign-in.` }) }); return temp },
+      completeOnboarding: (sid, perms, askEach) => {
         const s = get(); const { st, actor } = guardianOf(s, sid)
         const t = now()
-        let audit = append(s.audit, { actor, action: 'Guardian verified', detail: `Phone ${phone.replace(/.(?=.{3})/g, '•')} matched to admission record ${st.admNo}.` })
+        let audit = append(s.audit, { actor, action: 'Guardian confirmed', detail: `School-issued ID ${st.guardian} linked to student record ${st.admNo} by the school.` })
         audit = append(audit, { actor, action: 'Choices saved', detail: `${st.name} · ${(Object.keys(perms) as Purpose[]).map((k) => `${PN[k]}: ${perms[k] ? 'yes' : askEach && k === 'public' ? 'ask each time' : 'no'}`).join(' · ')} · notice v1.2 (${s.lang === 'hi' ? 'Hindi' : 'English'})` })
         set({ students: s.students.map((x) => (x.id === sid ? { ...x, perms, askEach, onboarded: true, consentAt: t } : x)), audit })
         return audit[audit.length - 1].hash
@@ -130,16 +156,19 @@ export const useDemo = create<State>()(
         return id
       },
       resolveCase: (id) => set((s) => ({ cases: s.cases.map((c) => (c.id === id ? { ...c, status: 'resolved' } : c)), audit: append(s.audit, { actor: 'School admin · Principal’s office', action: 'Request resolved', detail: id }) })),
+      setSettings: (p) => set((s) => ({ settings: { ...s.settings, ...p } })),
+      markTakenDown: (photoId) => set((s) => ({ published: { ...s.published, [photoId]: false }, audit: append(s.audit, { actor: 'School admin · Principal’s office', action: 'Taken down', photoId, detail: 'Live post removed after a guardian withdrew public use.' }) })),
+      updateLead: (id, p) => set((s) => ({ leads: s.leads.map((l) => (l.id === id ? { ...l, ...p } : l)) })),
       resetDemo: () => set({ ...initial(), viewer: 'admin', childId: 'S2' }),
       addLead: (l) => set((s) => {
         const qualified = l.q3 !== 'no' && l.q3 !== '' && /principal|owner|chair|director|head|management|trustee|admin/i.test(l.role)
-        return { leads: [{ ...l, id: 'L' + Date.now().toString(36).toUpperCase(), at: now(), stage: qualified ? 'qualified' : 'new' }, ...s.leads], visitors: Math.max(s.visitors, s.leads.length + 1) }
+        return { leads: [{ ...l, id: 'L' + Date.now().toString(36).toUpperCase(), at: now(), stage: qualified ? 'qualified' : 'new', owner: s.settings.owners.split(',')[0].trim(), nextMeeting: '', notes: '' }, ...s.leads], visitors: Math.max(s.visitors, s.leads.length + 1) }
       }),
       setStage: (id, stage) => set((s) => ({ leads: s.leads.map((l) => (l.id === id ? { ...l, stage } : l)) })),
       addVisitor: () => set((s) => ({ visitors: s.visitors + 1 })),
       resetLeads: () => set({ leads: [], visitors: 0 }),
     }),
-    { name: 'didac-demo-v2', storage: createJSONStorage(() => localStorage), version: 2 },
+    { name: 'didac-demo-v4', storage: createJSONStorage(() => localStorage), version: 4 },
   ),
 )
 export const getState = useDemo.getState

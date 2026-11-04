@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { toast } from 'sonner'
-import { Home, Images, Inbox as InboxIcon, SlidersHorizontal, Menu, ChevronLeft, Check, X, ShieldCheck, Smartphone, Languages, Download, Link2, Lock, Globe, School, Send, FileText, ArrowLeftRight, CheckCircle2 } from 'lucide-react'
+import { Home, Images, Inbox as InboxIcon, SlidersHorizontal, Menu, ChevronLeft, Check, X, ShieldCheck, Smartphone, Languages, Download, Link2, Lock, Globe, School, Send, FileText, CheckCircle2, Eye, EyeOff, KeyRound, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDemo, type PermInput } from '../store'
 import { evaluate, PURPOSES, type Purpose } from '../data'
@@ -8,7 +8,7 @@ import { Chip, PhotoView, Switch, fmtD } from '../ui'
 import { Zoom } from '../screens/Zoom'
 import { PhoneShell } from './PhoneShell'
 
-type Stage = 'welcome' | 'verify' | 'notice' | 'consent' | 'confirm' | 'receipt' | 'app'
+type Stage = 'welcome' | 'login' | 'password' | 'notice' | 'consent' | 'confirm' | 'receipt' | 'app'
 type Tab = 'home' | 'photos' | 'inbox' | 'choices' | 'more'
 type PubMode = 'no' | 'ask' | 'yes'
 const EX = ['media/annual-day-03.jpg', 'media/annual-day-12.jpg', 'media/sports-day-01.jpg']
@@ -21,15 +21,20 @@ export function ParentApp() {
   const child = s.students.find((x) => x.id === s.childId)!
   const hi = s.lang === 'hi'
   const t = (en: string, h: string) => (hi ? h : en)
-  const [stage, setStage] = React.useState<Stage>(child.onboarded ? 'app' : 'welcome')
+  const after = (sid: string): Stage => { const g = useDemo.getState(); return g.accounts[sid].mustChange ? 'password' : g.students.find((x) => x.id === sid)!.onboarded ? 'app' : 'notice' }
+  const [stage, setStage] = React.useState<Stage>(s.session ? after(s.session) : 'welcome')
   const [tab, setTab] = React.useState<Tab>('home')
   const [zoom, setZoom] = React.useState<string | null>(null)
   const [draft, setDraft] = React.useState<{ album?: boolean; internal?: boolean; public?: PubMode }>({})
-  const [phone, setPhone] = React.useState('98 7654 3210')
   const [receipt, setReceipt] = React.useState('')
   React.useEffect(() => { s.setViewer('parent') }, [])
-  React.useEffect(() => { setStage(child.onboarded ? 'app' : 'welcome'); setDraft({}); setTab('home') }, [child.id])
-  React.useEffect(() => { if (child.onboarded && stage !== 'app' && stage !== 'receipt') setStage('app') }, [child.onboarded, stage])
+  const first = React.useRef(true)
+  React.useEffect(() => {
+    if (first.current) { first.current = false; return }
+    setDraft({}); setTab('home')
+    if (!s.session) setStage('login'); else if (stage === 'welcome' || stage === 'login') setStage(after(s.session))
+  }, [s.session])
+  React.useEffect(() => { if (s.session && child.onboarded && !s.accounts[s.session].mustChange && ['welcome', 'login', 'notice', 'consent', 'confirm'].includes(stage)) setStage('app') }, [child.onboarded, stage, s.session])
   React.useEffect(() => { const h = (e: Event) => setZoom((e as CustomEvent<string>).detail); window.addEventListener('open-zoom', h); return () => window.removeEventListener('open-zoom', h) }, [])
   React.useEffect(() => { const h = (e: Event) => { setStage('app'); setTab((e as CustomEvent<Tab>).detail) }; window.addEventListener('parent-tab', h); return () => window.removeEventListener('parent-tab', h) }, [])
 
@@ -42,7 +47,7 @@ export function ParentApp() {
   /* ---------- onboarding ---------- */
   if (stage !== 'app') return (
     <PhoneShell>
-      <Onboarding {...{ stage, setStage, draft, setDraft, phone, setPhone, receipt, setReceipt, lang, t, hi }} />
+      <Onboarding {...{ stage, setStage, draft, setDraft, receipt, setReceipt, lang, t, hi, after }} />
     </PhoneShell>
   )
 
@@ -59,7 +64,7 @@ export function ParentApp() {
         {tab === 'photos' && <PhotosTab {...{ child, mine, setZoom, t }} />}
         {tab === 'inbox' && <InboxTab {...{ child, t }} />}
         {tab === 'choices' && <ChoicesTab {...{ child, t, hi }} />}
-        {tab === 'more' && <MoreTab {...{ child, t, setStage, setDraft }} />}
+        {tab === 'more' && <MoreTab {...{ child, t, setStage }} />}
       </div>
       <nav className="grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]" aria-label="App">
         {tabs.map(([k, l, i, n]) => (
@@ -74,26 +79,30 @@ export function ParentApp() {
 }
 
 /* =============== onboarding =============== */
-function Onboarding({ stage, setStage, draft, setDraft, phone, setPhone, receipt, setReceipt, lang, t, hi }: {
+function Onboarding({ stage, setStage, draft, setDraft, receipt, setReceipt, lang, t, hi, after }: {
   stage: Stage; setStage: (s: Stage) => void; draft: { album?: boolean; internal?: boolean; public?: PubMode }; setDraft: (d: { album?: boolean; internal?: boolean; public?: PubMode }) => void
-  phone: string; setPhone: (v: string) => void; receipt: string; setReceipt: (v: string) => void; lang: React.ReactNode; t: (a: string, b: string) => string; hi: boolean
+  after: (sid: string) => Stage; receipt: string; setReceipt: (v: string) => void; lang: React.ReactNode; t: (a: string, b: string) => string; hi: boolean
 }) {
   const s = useDemo()
   const child = s.students.find((x) => x.id === s.childId)!
   const [slide, setSlide] = React.useState(0)
-  const [otpSent, setOtpSent] = React.useState(false)
-  const [otp, setOtp] = React.useState('')
-  const [rel, setRel] = React.useState('Mother')
+  const [uid, setUid] = React.useState('')
+  const [pw, setPw] = React.useState('')
+  const [show, setShow] = React.useState(false)
+  const [err, setErr] = React.useState<'' | 'bad' | 'locked'>('')
+  const [np, setNp] = React.useState('')
+  const [np2, setNp2] = React.useState('')
   const [iam, setIam] = React.useState(false)
   const [read, setRead] = React.useState(false)
   const [ci, setCi] = React.useState(0)
   const order: Purpose[] = ['album', 'internal', 'public']
-  const steps: Stage[] = ['verify', 'notice', 'consent', 'confirm']
-  const back = () => { if (stage === 'consent' && ci > 0) setCi(ci - 1); else { const i = steps.indexOf(stage); setStage(i <= 0 ? 'welcome' : steps[i - 1]) } }
+  const steps: Stage[] = ['login', 'notice', 'consent', 'confirm']
+  const idx = stage === 'password' ? 0 : steps.indexOf(stage)
+  const back = () => { if (stage === 'consent' && ci > 0) setCi(ci - 1); else if (stage === 'login') setStage('welcome'); else if (stage === 'password') { s.signOut(); setStage('login') } else { const i = steps.indexOf(stage); setStage(steps[i - 1]) } }
   const header = stage !== 'welcome' && stage !== 'receipt' && (
     <div className="flex items-center justify-between gap-2 px-4 pt-3">
-      <button type="button" aria-label="Back" onClick={back} className="grid size-10 place-items-center rounded-full hover:bg-sand"><ChevronLeft className="size-5" /></button>
-      <div className="flex flex-1 justify-center gap-1.5">{steps.map((x, i) => <span key={x} className={cn('h-1.5 w-8 rounded-full', i <= steps.indexOf(stage) ? 'bg-gold' : 'bg-sand')} />)}</div>
+      {stage === 'notice' ? <span className="size-10" /> : <button type="button" aria-label="Back" onClick={back} className="grid size-10 place-items-center rounded-full hover:bg-sand"><ChevronLeft className="size-5" /></button>}
+      <div className="flex flex-1 justify-center gap-1.5">{steps.map((x, i) => <span key={x} className={cn('h-1.5 w-8 rounded-full', i <= idx ? 'bg-gold' : 'bg-sand')} />)}</div>
       {lang}
     </div>)
 
@@ -113,37 +122,56 @@ function Onboarding({ stage, setStage, draft, setDraft, phone, setPhone, receipt
           <p className="mt-3 max-w-xs text-[15px] text-white/75">{sl.b}</p>
           <div className="mt-6 flex gap-1.5">{slides.map((_, i) => <span key={i} className={cn('h-1.5 rounded-full transition-all', i === slide ? 'w-6 bg-gold' : 'w-1.5 bg-white/30')} />)}</div>
         </div>
-        <Primary className="bg-gold" onClick={() => (slide < 2 ? setSlide(slide + 1) : setStage('verify'))}>{slide < 2 ? t('Next', 'आगे') : t('Get started', 'शुरू करें')}</Primary>
+        <Primary className="bg-gold" onClick={() => (slide < 2 ? setSlide(slide + 1) : setStage(s.session ? after(s.session) : 'login'))}>{slide < 2 ? t('Next', 'आगे') : t('Get started', 'शुरू करें')}</Primary>
         <p className="mt-3 text-center text-[11px] text-white/50">{t('Invite from Sunrise Public School for', 'सनराइज़ पब्लिक स्कूल की ओर से आमंत्रण:')} {child.name}</p>
       </div>)
   }
 
-  if (stage === 'verify') return (
-    <div className="flex h-full flex-col">{header}
-      <div className="flex-1 overflow-y-auto p-5">
-        <h2 className="text-2xl font-bold">{t('Verify it’s you', 'पुष्टि करें कि यह आप हैं')}</h2>
-        <p className="mt-1 text-sm text-ink-2">{t('We match your mobile number with the school’s admission records, so only a parent or guardian can set choices for a child.', 'हम आपके मोबाइल नंबर को स्कूल के प्रवेश रिकॉर्ड से मिलाते हैं, ताकि केवल अभिभावक ही बच्चे के लिए पसंद तय कर सकें।')}</p>
-        <label className="mt-5 block text-sm font-semibold">{t('Mobile number registered with the school', 'स्कूल में पंजीकृत मोबाइल नंबर')}
-          <div className="mt-1.5 flex gap-2"><span className="grid h-12 place-items-center rounded-xl border border-line bg-sand px-3 text-sm">+91</span><input className="h-12 flex-1 rounded-xl border border-[#d6cdb8] bg-white px-3 text-base" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></div></label>
-        {!otpSent ? <Primary className="mt-4" onClick={() => { setOtpSent(true); setOtp('') }}>{t('Send OTP', 'OTP भेजें')}</Primary> : (
-          <div className="mt-4 space-y-3">
-            <label className="block text-sm font-semibold">{t('Enter the 6-digit code', '6 अंकों का कोड दर्ज करें')}<input className="mt-1.5 h-12 w-full rounded-xl border border-[#d6cdb8] bg-white px-3 text-center text-xl tracking-[.5em]" inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} placeholder="••••••" /></label>
-            <button type="button" className="text-xs font-semibold text-gold" onClick={() => setOtp('482913')}>Demo: tap to fill code 482913</button>
-          </div>)}
-        {otp.length === 6 && (
-          <div className="pop mt-5 rounded-2xl border border-ok/30 bg-ok-bg p-4">
-            <div className="flex items-center gap-1.5 text-sm font-bold text-ok"><CheckCircle2 className="size-4" />{t('Found in admission records', 'प्रवेश रिकॉर्ड में मिला')}</div>
-            <div className="mt-2 flex items-center gap-3"><div className="grid size-12 place-items-center rounded-full bg-gold text-lg font-bold text-white">{child.name[0]}</div><div><div className="font-bold">{child.name}</div><div className="text-xs text-ink-2">Class {child.cls} · {child.admNo}</div></div></div>
-            <label className="mt-3 block text-xs font-semibold">{t('Your relationship', 'आपका संबंध')}<select value={rel} onChange={(e) => setRel(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-line bg-white px-2 text-sm">{['Mother', 'Father', 'Legal guardian'].map((r) => <option key={r}>{r}</option>)}</select></label>
-            <label className="mt-3 flex items-start gap-2 text-xs text-ink-2"><input type="checkbox" className="mt-0.5 size-4" checked={iam} onChange={(e) => setIam(e.target.checked)} />{t(`I confirm I am ${child.name.split(' ')[0]}’s parent or legal guardian.`, `मैं पुष्टि करता/करती हूँ कि मैं ${child.name.split(' ')[0]} का अभिभावक हूँ।`)}</label>
-          </div>)}
-      </div>
-      <div className="space-y-2 p-5 pt-0"><Primary disabled={!(otp.length === 6 && iam)} onClick={() => setStage('notice')}>{t('Continue', 'जारी रखें')}</Primary><p className="text-center text-[11px] text-ink-3">Prototype: how guardian authority is verified in real use is under legal review.</p></div>
-    </div>)
+  if (stage === 'login') {
+    const demo = [['S2', 'first sign-in · onboarding'], ['S1', 'returning parent'], ['S3', 'returning parent'], ['S4', 'returning parent']] as const
+    const submit = () => { const r = s.login(uid, pw); setErr(r === 'ok' ? '' : r); if (r === 'ok') { const sid = useDemo.getState().session!; setStage(after(sid)); setPw('') } }
+    return (
+      <div className="flex h-full flex-col">{header}
+        <div className="flex-1 overflow-y-auto p-5">
+          <h2 className="text-2xl font-bold">{t('Sign in', 'साइन इन करें')}</h2>
+          <p className="mt-1 text-sm text-ink-2">{t('Use the ID and password on the login slip the school gave you.', 'स्कूल द्वारा दी गई लॉगिन पर्ची पर लिखा आईडी और पासवर्ड इस्तेमाल करें।')}</p>
+          <div className="mt-4 rounded-2xl border-2 border-dashed border-[#cdbf9f] bg-white p-3 text-xs"><div className="eyebrow mb-1">{t('Login slip · from your school', 'लॉगिन पर्ची · आपके स्कूल से')}</div><div className="flex justify-between font-mono"><span>ID: G-••••</span><span>Password: ••••-••••-•••</span></div></div>
+          <label className="mt-4 block text-sm font-semibold">{t('School ID', 'स्कूल आईडी')}<input className="mt-1.5 h-12 w-full rounded-xl border border-[#d6cdb8] bg-white px-3 font-mono text-base uppercase tracking-wider" autoCapitalize="characters" autoComplete="username" placeholder="G-4K7Q" value={uid} onChange={(e) => { setUid(e.target.value); setErr('') }} /></label>
+          <label className="mt-3 block text-sm font-semibold">{t('Password', 'पासवर्ड')}
+            <div className="relative mt-1.5"><input className="h-12 w-full rounded-xl border border-[#d6cdb8] bg-white pl-3 pr-12 font-mono text-base" type={show ? 'text' : 'password'} autoComplete="current-password" value={pw} onChange={(e) => { setPw(e.target.value); setErr('') }} onKeyDown={(e) => e.key === 'Enter' && uid && pw && submit()} /><button type="button" aria-label={show ? 'Hide password' : 'Show password'} onClick={() => setShow(!show)} className="absolute right-1 top-1 grid size-10 place-items-center text-ink-3">{show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}</button></div></label>
+          {err === 'bad' && <p className="mt-2 text-sm font-semibold text-risk">{t('That ID or password isn’t right. Check your slip, or ask the school office for a new one.', 'आईडी या पासवर्ड सही नहीं है। अपनी पर्ची देखें या स्कूल कार्यालय से नई पर्ची माँगें।')}</p>}
+          {err === 'locked' && <p className="mt-2 text-sm font-semibold text-risk">{t('Too many tries. Ask the school office to reissue your login.', 'बहुत अधिक प्रयास। स्कूल कार्यालय से लॉगिन दोबारा जारी कराएँ।')}</p>}
+          <Primary className="mt-4" disabled={!uid || !pw} onClick={submit}>{t('Sign in', 'साइन इन')}</Primary>
+          <p className="mt-3 text-xs text-ink-2"><KeyRound className="mr-1 inline size-3.5 text-gold" />{t('Forgot it? The school office can issue a new slip. We don’t hold your phone number or email, so it can’t be reset here.', 'भूल गए? स्कूल कार्यालय नई पर्ची दे सकता है। हमारे पास आपका फ़ोन नंबर या ईमेल नहीं है, इसलिए यहाँ रीसेट नहीं हो सकता।')}</p>
+          <div className="mt-4 rounded-2xl bg-sand p-3 text-xs text-ink-2"><b>{t('Your privacy', 'आपकी गोपनीयता')}</b><br />{t('Your ID is random. This app doesn’t store your name or phone number — the school alone keeps the link between your ID and your family. Your child’s name is partly hidden on screen.', 'आपकी आईडी यादृच्छिक है। यह ऐप आपका नाम या फ़ोन नंबर नहीं रखता — आईडी और परिवार का संबंध केवल स्कूल के पास रहता है। आपके बच्चे का नाम स्क्रीन पर आंशिक रूप से छिपा रहता है।')}</div>
+          <details className="mt-3 rounded-2xl border border-line bg-white p-3 text-xs"><summary className="cursor-pointer font-bold">Demo logins (booth only)</summary>
+            <div className="mt-2 space-y-1.5">{demo.map(([sid, note]) => <button key={sid} type="button" onClick={() => { setUid(s.accounts[sid].id); setPw(s.accounts[sid].password); setErr('') }} className="flex w-full justify-between rounded-xl bg-sand px-3 py-2.5 text-left font-mono"><span>{s.accounts[sid].id}</span><span className="font-sans text-ink-3">{note}</span></button>)}</div></details>
+        </div>
+      </div>)
+  }
+
+  if (stage === 'password') {
+    const ok = np.length >= 8 && /\d/.test(np) && np === np2 && np !== s.accounts[s.session!]?.temp
+    const strength = Math.min(4, (np.length >= 8 ? 1 : 0) + (/\d/.test(np) ? 1 : 0) + (/[A-Z]/.test(np) ? 1 : 0) + (/[^A-Za-z0-9]/.test(np) || np.length >= 12 ? 1 : 0))
+    return (
+      <div className="flex h-full flex-col">{header}
+        <div className="flex-1 overflow-y-auto p-5">
+          <h2 className="text-2xl font-bold">{t('Set your own password', 'अपना पासवर्ड बनाएँ')}</h2>
+          <p className="mt-1 text-sm text-ink-2">{t('The password on your slip is temporary. Choose one only you know — the school can’t see it.', 'पर्ची पर लिखा पासवर्ड अस्थायी है। ऐसा पासवर्ड चुनें जो केवल आप जानते हों — स्कूल उसे नहीं देख सकता।')}</p>
+          <label className="mt-4 block text-sm font-semibold">{t('New password', 'नया पासवर्ड')}<input type={show ? 'text' : 'password'} className="mt-1.5 h-12 w-full rounded-xl border border-[#d6cdb8] bg-white px-3 text-base" value={np} onChange={(e) => setNp(e.target.value)} autoComplete="new-password" /></label>
+          <div className="mt-2 flex gap-1">{[0, 1, 2, 3].map((i) => <span key={i} className={cn('h-1.5 flex-1 rounded-full', i < strength ? (strength < 3 ? 'bg-warn' : 'bg-ok') : 'bg-sand')} />)}</div>
+          <label className="mt-3 block text-sm font-semibold">{t('Confirm password', 'पासवर्ड दोहराएँ')}<input type={show ? 'text' : 'password'} className="mt-1.5 h-12 w-full rounded-xl border border-[#d6cdb8] bg-white px-3 text-base" value={np2} onChange={(e) => setNp2(e.target.value)} autoComplete="new-password" /></label>
+          <button type="button" onClick={() => setShow(!show)} className="mt-2 text-xs font-semibold text-gold">{show ? t('Hide', 'छिपाएँ') : t('Show', 'दिखाएँ')}</button>
+          <ul className="mt-3 space-y-1 text-xs text-ink-2">{[[np.length >= 8, t('At least 8 characters', 'कम से कम 8 अक्षर')], [/\d/.test(np), t('Includes a number', 'एक अंक शामिल')], [!!np2 && np === np2, t('Both match', 'दोनों मेल खाते हैं')]].map(([on, l]) => <li key={String(l)} className={on ? 'text-ok' : ''}>{on ? '✓' : '○'} {l as string}</li>)}</ul>
+        </div>
+        <div className="p-5 pt-0"><Primary disabled={!ok} onClick={() => { s.changePassword(s.session!, np); setNp(''); setNp2(''); setStage(after(s.session!)) }}>{t('Save and continue', 'सहेजें और आगे बढ़ें')}</Primary></div>
+      </div>)
+  }
 
   if (stage === 'notice') return (
     <div className="flex h-full flex-col">{header}
       <div className="flex-1 overflow-y-auto p-5">
+        <div className="mb-3 flex items-center gap-3 rounded-2xl bg-white p-3"><div className="grid size-10 place-items-center rounded-full bg-gold text-sm font-bold text-white">{child.name[0]}</div><div className="text-sm"><b>{child.name}</b><div className="text-xs text-ink-3">{t('Class', 'कक्षा')} {child.cls} · {child.admNo} · {t('ID', 'आईडी')} {child.guardian}</div></div></div>
         <div className="flex items-center gap-2"><FileText className="size-5 text-gold" /><span className="eyebrow">{t('Notice v1.2 · school photos & video', 'सूचना v1.2 · स्कूल की फ़ोटो व वीडियो')}</span></div>
         <h2 className="mt-1 text-2xl font-bold">{t('How the school uses photos', 'स्कूल फ़ोटो का उपयोग कैसे करता है')}</h2>
         <div className="mt-4 space-y-2.5">
@@ -208,10 +236,10 @@ function Onboarding({ stage, setStage, draft, setDraft, phone, setPhone, receipt
           <h2 className="text-2xl font-bold">{t('Confirm your choices', 'अपनी पसंद की पुष्टि करें')}</h2>
           <p className="mt-1 text-sm text-ink-2">{t(`For ${child.name}. Saved with the notice version and time.`, `${child.name} के लिए। सूचना संस्करण और समय के साथ सहेजा जाएगा।`)}</p>
           <div className="mt-4 space-y-2">{rows.map(([l, v, on]) => <div key={l} className="flex items-center justify-between rounded-2xl border border-line bg-white p-3.5"><span className="text-sm font-semibold">{l}</span><Chip tone={on ? 'ok' : 'muted'}>{v}</Chip></div>)}</div>
-          <div className="mt-4 rounded-2xl bg-sand p-3.5 text-xs text-ink-2">{t('By confirming, you record these choices as ' + child.guardian + ', guardian of ' + child.name + ', under notice v1.2. You can change them any time.', child.guardian + ', ' + child.name + ' के अभिभावक के रूप में आप ये पसंद सूचना v1.2 के तहत दर्ज कर रहे हैं। आप इन्हें कभी भी बदल सकते हैं।')}</div>
+          <div className="mt-4 rounded-2xl bg-sand p-3.5 text-xs text-ink-2">{t('You record these choices under ID ' + child.guardian + ', for ' + child.name + ', under notice v1.2. You can change them any time.', 'आप आईडी ' + child.guardian + ' के तहत, ' + child.name + ' के लिए, सूचना v1.2 के अंतर्गत ये पसंद दर्ज कर रहे हैं। आप इन्हें कभी भी बदल सकते हैं।')}</div>
         </div>
-        <div className="p-5 pt-0"><Primary onClick={() => {
-          const id = s.completeOnboarding(child.id, { album: !!draft.album, internal: !!draft.internal, public: pub === 'yes' }, pub === 'ask', phone)
+        <div className="space-y-3 p-5 pt-0"><label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-5" checked={iam} onChange={(e) => setIam(e.target.checked)} />{t('I confirm I am the parent or legal guardian of this child.', 'मैं पुष्टि करता/करती हूँ कि मैं इस बच्चे का अभिभावक हूँ।')}</label><Primary disabled={!iam} onClick={() => {
+          const id = s.completeOnboarding(child.id, { album: !!draft.album, internal: !!draft.internal, public: pub === 'yes' }, pub === 'ask')
           setReceipt(id); setStage('receipt'); toast.success(t('Choices saved', 'पसंद सहेजी गई'))
         }}>{t('Confirm and save', 'पुष्टि करें और सहेजें')}</Primary></div>
       </div>)
@@ -240,7 +268,7 @@ type T = (a: string, b: string) => string
 function HomeTab({ child, mine, pending, setTab, setZoom, t }: { child: Child; mine: ReturnType<typeof useDemo.getState>['photos']; pending: unknown[]; setTab: (t: Tab) => void; setZoom: (id: string) => void; t: T }) {
   const s = useDemo()
   const ids = new Set(mine.map((p) => p.id))
-  const feed = s.audit.filter((a) => (a.photoId && ids.has(a.photoId) && !a.actor.startsWith('Guardian')) || a.actor === `Guardian · ${child.guardian}`).slice(-5).reverse()
+  const feed = s.audit.filter((a) => (a.photoId && ids.has(a.photoId) && !a.actor.startsWith('Guardian')) || a.actor === `Guardian ${child.guardian}`).slice(-5).reverse()
   const live = mine.filter((p) => s.published[p.id])
   const on = (['album', 'internal', 'public'] as Purpose[]).filter((k) => child.perms[k]).length
   return (
@@ -310,7 +338,7 @@ function InboxTab({ child, t }: { child: Child; t: T }) {
 
 function ChoicesTab({ child, t, hi }: { child: Child; t: T; hi: boolean }) {
   const s = useDemo()
-  const hist = s.audit.filter((a) => a.actor === `Guardian · ${child.guardian}` && /Permission|Choices|approval|declined/i.test(a.action)).slice(-5).reverse()
+  const hist = s.audit.filter((a) => a.actor === `Guardian ${child.guardian}` && /Permission|Choices|approval|declined/i.test(a.action)).slice(-5).reverse()
   const mode: PubMode = child.perms.public ? 'yes' : child.askEach ? 'ask' : 'no'
   const setMode = (m: PubMode) => { s.setPerm(child.id, 'public', m === 'yes'); s.setAskEach(child.id, m === 'ask'); toast(m === 'yes' ? t('Public use allowed', 'सार्वजनिक उपयोग की अनुमति') : m === 'ask' ? t('The school will ask each time', 'स्कूल हर बार पूछेगा') : t('Public use withdrawn', 'सार्वजनिक उपयोग वापस')) }
   return (
@@ -328,7 +356,7 @@ function ChoicesTab({ child, t, hi }: { child: Child; t: T; hi: boolean }) {
     </div>)
 }
 
-function MoreTab({ child, t, setStage, setDraft }: { child: Child; t: T; setStage: (s: Stage) => void; setDraft: (d: object) => void }) {
+function MoreTab({ child, t, setStage }: { child: Child; t: T; setStage: (s: Stage) => void }) {
   const s = useDemo()
   const [kind, setKind] = React.useState<'Access' | 'Correction' | 'Erasure' | 'Grievance'>('Access')
   const [text, setText] = React.useState('')
@@ -345,9 +373,9 @@ function MoreTab({ child, t, setStage, setDraft }: { child: Child; t: T; setStag
         {cases.length > 0 && <div className="mt-3 space-y-2">{cases.map((c) => <div key={c.id} className="rounded-xl bg-sand p-2.5 text-xs"><div className="flex justify-between"><b>{c.id} · {c.kind}</b><Chip tone={c.status === 'open' ? 'warn' : 'ok'}>{c.status}</Chip></div><div className="text-ink-3">{c.text.slice(0, 70)} · {t('reply by', 'उत्तर तक')} {fmtD(c.due)}</div></div>)}</div>}
       </div>
       {row(<FileText className="size-5" />, t('Read the notice again', 'सूचना फिर पढ़ें'), () => { toast(t('Notice v1.2 · opened', 'सूचना v1.2 खुली')) ; }, 'v1.2 · English / हिन्दी')}
-      <div className="flex items-center gap-2 px-1 pt-1 text-xs font-bold uppercase tracking-wider text-ink-3"><ArrowLeftRight className="size-3.5" />{t('Demo: sign in as another parent', 'डेमो: दूसरे अभिभावक के रूप में')}</div>
-      <select aria-label="Switch child" value={child.id} onChange={(e) => { s.setChild(e.target.value); setDraft({}) }} className="h-12 w-full rounded-2xl border border-line bg-white px-3 text-sm">{s.students.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.guardian}{x.onboarded ? '' : ' (not set up)'}</option>)}</select>
+      <div className="card p-3.5 text-xs text-ink-2"><div className="mb-1 flex items-center gap-2 text-sm font-bold text-ink"><KeyRound className="size-4 text-gold" />{t('About your login', 'आपके लॉगिन के बारे में')}</div>{t(`Signed in as ID ${child.guardian}. This ID is random and was issued by the school. The app doesn’t store your name or phone number; the school keeps the link to your family. Your child’s name is partly hidden.`, `आईडी ${child.guardian} से साइन इन हैं। यह आईडी यादृच्छिक है और स्कूल ने जारी की है। ऐप आपका नाम या फ़ोन नंबर नहीं रखता; परिवार से संबंध स्कूल के पास है। आपके बच्चे का नाम आंशिक रूप से छिपा है।`)}</div>
       {row(<Smartphone className="size-5" />, t('Replay onboarding', 'ऑनबोर्डिंग फिर चलाएँ'), () => setStage('welcome'))}
+      {row(<LogOut className="size-5" />, t('Sign out', 'साइन आउट'), () => { s.signOut(); toast(t('Signed out', 'साइन आउट हो गए')) })}
       {row(<Lock className="size-5" />, t('Switch app', 'ऐप बदलें'), () => s.setRole(null))}
       <p className="pt-2 text-center text-[11px] text-ink-3"><X className="mr-1 inline size-3" />Prototype with synthetic data · not legal advice</p>
     </div>)

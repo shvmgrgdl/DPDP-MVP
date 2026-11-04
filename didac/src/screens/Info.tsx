@@ -1,5 +1,5 @@
 import { ChevronDown, Check } from 'lucide-react'
-import { COMPARE, FAQS, LEGAL_MAP, TIMELINE, type Status } from '../data'
+import { COMPARE, DIFFS, FAQS, LEGAL_MAP, TIMELINE, type Status } from '../data'
 import { Chip, SectionTitle } from '../ui'
 
 const tone: Record<Status, 'ok' | 'info' | 'gold' | 'muted'> = { Prototype: 'gold', Planned: 'info', Service: 'ok', 'Not offered': 'muted' }
@@ -7,11 +7,12 @@ const tone: Record<Status, 'ok' | 'info' | 'gold' | 'muted'> = { Prototype: 'gol
 export function Law() {
   return (
     <section className="mx-auto max-w-6xl px-4 py-8">
-      <SectionTitle eyebrow="Knowledge about DPDPA" title="MediaGuard × the DPDP Act" sub="How each school-media control maps to the Act. A working interpretation, not legal advice — counsel should confirm for your school." />
+      <SectionTitle eyebrow="Knowledge about DPDPA" title="MediaGuard × the DPDP Act" sub="How each school-media control maps to the Act. A working interpretation, not legal advice. Wording is pending review by Indian data-protection counsel; confirm for your school." />
       <div className="mb-6 grid gap-3 md:grid-cols-3">
         {TIMELINE.map((t, i) => (
           <div key={t.date} className="card p-4"><Chip tone={i === 0 ? 'ok' : 'gold'}>{i === 0 ? 'In force' : 'Scheduled'}</Chip><div className="mt-2 text-xl font-bold">{t.date}</div><div className="font-semibold">{t.title}</div><p className="mt-1 text-sm text-ink-2">{t.body}</p></div>))}
       </div>
+      <p className="mb-4 rounded-xl bg-gold-50 p-3 text-sm font-semibold">Schools should prepare ahead of the major provisions scheduled to take effect in May 2027. Not every obligation is in force today.</p>
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead><tr className="bg-sand text-left text-xs text-ink-3"><th className="p-3">Provision</th><th className="p-3">Topic</th><th className="p-3">What the product does</th><th className="p-3">Status</th></tr></thead>
@@ -36,6 +37,7 @@ export function Compare() {
           <tbody>{COMPARE.map((r) => (
             <tr key={r.feature} className="border-t border-line align-top"><td className="p-3 font-semibold">{r.feature}</td><td className="p-3 text-ink-2">{r.px}</td><td className="p-3 text-ink-2">{r.mg}</td></tr>))}</tbody>
       </table></div>
+      <div className="card mt-5 p-5"><div className="mb-1 flex items-center gap-2"><Chip tone="gold">To validate with schools</Chip><span className="font-bold">Where we think we can be different</span></div><ul className="mt-2 grid gap-1.5 text-sm text-ink-2 md:grid-cols-2">{DIFFS.map((d) => <li key={d} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-gold" />{d}</li>)}</ul><p className="mt-2 text-xs text-ink-3">These are hypotheses, not proven advantages.</p></div>
       <p className="mt-3 max-w-3xl text-xs text-ink-3">Pixevety information is drawn from its public website, FAQs and listings as reviewed on 31 Oct 2026; figures such as school counts and certifications are company claims. We have not audited them. Corrections welcome.</p>
     </section>
   )

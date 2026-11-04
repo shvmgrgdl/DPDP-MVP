@@ -6,16 +6,18 @@ import { Admin } from './Admin'
 import { ParentApp } from '../app/ParentApp'
 import { Gallery } from './Gallery'
 
-interface Step { title: string; body: string; view: Viewer; photo?: string; tab?: 'queue' | 'perms' | 'evidence'; cta?: string; run?: () => void }
+interface Step { title: string; body: string; view: Viewer; photo?: string; tab?: 'queue' | 'perms' | 'requests' | 'evidence'; cta?: string; run?: () => void }
 const g = () => useDemo.getState()
 const STEPS: Step[] = [
-  { title: '1 · Annual Day photos arrive', body: 'A photographer uploads the group photo. Diya’s guardian hasn’t set choices yet, so public use is blocked by default; one face is unknown.', view: 'admin', photo: 'P1', tab: 'queue' },
-  { title: '2 · A guardian says “private parent album only”', body: 'In the parent app Diya’s guardian verifies, reads the notice and chooses: album yes, inside school no, website & social no. (Or tap to do it for her.)', view: 'parent', cta: 'Do it for me', run: () => { g().setChild('S2'); g().completeOnboarding('S2', { album: true, internal: false, public: false }, false, '9876543210') } },
-  { title: '3 · Public publishing is blocked', body: 'The group photo includes Diya, so the gate holds it back — with the reason. Approve stays off.', view: 'admin', photo: 'P1', tab: 'queue' },
+  { title: '1 · Annual Day photos arrive', body: 'A photographer uploads the group photo. One guardian (D••a’s) hasn’t signed in or set choices yet, so public use is blocked by default; one face is unknown.', view: 'admin', photo: 'P1', tab: 'queue' },
+  { title: '2 · A guardian says “private parent album only”', body: 'In the parent app the guardian signs in with a school-issued ID, sets a password, reads the notice and chooses: album yes, inside school no, website & social no. (Or tap to do it for them.)', view: 'parent', cta: 'Do it for me', run: () => { g().signInAs('S2'); g().completeOnboarding('S2', { album: true, internal: false, public: false }, false) } },
+  { title: '3 · Public publishing is blocked', body: 'The group photo includes D••a, whose guardian chose private only, so the gate holds it back — with the reason. Approve stays off.', view: 'admin', photo: 'P1', tab: 'queue' },
   { title: '4 · The unknown child goes to a person', body: 'Unmatched faces are never presumed consented. Click face 4 and decide: a student, or not a student.', view: 'admin', photo: 'P1', tab: 'queue', cta: 'Mark face 4 as an adult', run: () => g().assignFace('P1', 3, 'adult') },
-  { title: '5 · The school approves an eligible image', body: 'The choir photo only shows Meera, whose guardian allows public use. The school approves it — decision recorded.', view: 'admin', photo: 'P2', tab: 'queue', cta: 'Approve this photo', run: () => g().approve('P2') },
-  { title: '6 · Parents see only their child', body: 'Diya’s guardian sees photos with Diya. Other children are blurred. Each open is logged.', view: 'parent', cta: 'Open a photo', run: () => { g().openPhoto('P3'); window.dispatchEvent(new CustomEvent('open-zoom', { detail: 'P3' })) } },
+  { title: '5 · The school approves an eligible image', body: 'The choir photo only shows M•••a, whose guardian allows public use. The school approves it — decision recorded.', view: 'admin', photo: 'P2', tab: 'queue', cta: 'Approve this photo', run: () => g().approve('P2') },
+  { title: '6 · Parents see only their child', body: 'The guardian sees only photos with their child. Other children are blurred. Each open is logged.', view: 'parent', cta: 'Open a photo', run: () => { g().signInAs('S2'); g().openPhoto('P3'); window.dispatchEvent(new CustomEvent('open-zoom', { detail: 'P3' })) } },
   { title: '7 · The evidence log', body: 'Every permission, review and approval, chained so edits are detectable. Zoom any photo for who opened it and when.', view: 'admin', tab: 'evidence' },
+  { title: 'Bonus 8 · A guardian withdraws after a post', body: 'M•••a’s guardian turns public use off. The live choir post is flagged for takedown immediately — future managed sharing stops.', view: 'parent', cta: 'Withdraw as that guardian', run: () => { g().signInAs('S4'); g().setPerm('S4', 'public', false) } },
+  { title: 'Bonus 9 · The school takes it down', body: 'The takedown task sits in the admin’s Requests tab. Mark it done — the action is logged. Copies already shared elsewhere can’t be recalled, and we say so.', view: 'admin', tab: 'requests', cta: 'Mark taken down', run: () => g().markTakenDown('P2') },
 ]
 
 export function Demo() {

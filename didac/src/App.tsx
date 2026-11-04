@@ -11,7 +11,10 @@ import { Home } from './screens/Home'
 import { Story } from './screens/Story'
 import { Demo } from './screens/Demo'
 import { Law, Compare, Faq } from './screens/Info'
-import { Pilot, Leads } from './screens/Pilot'
+import { Pilot } from './screens/Pilot'
+import { Team } from './screens/Team'
+import { OnePager } from './screens/OnePager'
+import { GalleryApp } from './app/GalleryApp'
 
 const MARK = <svg viewBox="0 0 32 32" className="size-8"><rect width="32" height="32" rx="8" fill="#c8921a" /><path d="M16 6.5l8 3v6.2c0 5-3.4 8.6-8 10.3-4.6-1.7-8-5.3-8-10.3V9.5l8-3z" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" /><path d="M12.2 16.2l2.6 2.6 5-5.2" fill="none" stroke="#14213d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 
@@ -25,7 +28,8 @@ function Booth() {
     window.addEventListener('hashchange', h); window.addEventListener('online', on); window.addEventListener('offline', off); window.addEventListener('beforeinstallprompt', bip)
     return () => { window.removeEventListener('hashchange', h); window.removeEventListener('online', on); window.removeEventListener('offline', off); window.removeEventListener('beforeinstallprompt', bip) }
   }, [])
-  const page = { home: <Home />, story: <Story />, demo: <Demo />, law: <Law />, compare: <Compare />, faq: <Faq />, pilot: <Pilot />, leads: <Leads /> }[route]
+  if (route === 'cinema') return <Story bare />
+  const page = { home: <Home />, story: <Story />, demo: <Demo />, law: <Law />, compare: <Compare />, faq: <Faq />, pilot: <Pilot />, onepager: <OnePager />, team: <Team />, cinema: <Story bare /> }[route]
   return (
     <div className="min-h-dvh">
       <header className="no-print sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur">
@@ -41,7 +45,7 @@ function Booth() {
       </header>
       <main>{page}</main>
       <footer className="no-print border-t border-line px-4 py-6 text-center text-xs text-ink-3">
-        Prototype with synthetic data and a fictional school. Not legal advice, not a certification. <button type="button" className="underline" onClick={() => go('leads')}>Team</button>
+        Prototype with synthetic data and a fictional school. Not legal advice, not a certification. <button type="button" className="underline" onClick={() => go('team')}>Team</button>
       </footer>
     </div>
   )
@@ -52,8 +56,9 @@ export default function App() {
   const setRole = useDemo((s) => s.setRole)
   React.useEffect(() => {
     const r = new URLSearchParams(location.search).get('role')
-    if (r === 'parent' || r === 'admin' || r === 'photographer' || r === 'booth') setRole(r)
+    if (r === 'parent' || r === 'admin' || r === 'photographer' || r === 'gallery' || r === 'booth') setRole(r)
   }, [setRole])
+  if (location.hash.startsWith('#/cinema')) return <Story bare />
   return (
     <>
       <Toaster position="top-center" richColors closeButton={false} />
@@ -61,6 +66,7 @@ export default function App() {
       {role === 'parent' && <div className="min-h-dvh bg-sand md:grid md:place-items-center md:py-6"><ParentApp /></div>}
       {role === 'admin' && <AdminApp />}
       {role === 'photographer' && <div className="min-h-dvh bg-sand md:grid md:place-items-center md:py-6"><PhotographerApp /></div>}
+      {role === 'gallery' && <GalleryApp />}
       {role === 'booth' && <Booth />}
     </>
   )
