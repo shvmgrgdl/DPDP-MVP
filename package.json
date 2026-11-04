@@ -9,9 +9,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "preview": "vite preview --port 4173",
     "demo": "vite build && vite preview --port 4173 --open",
-    "test": "vitest run"
+    "test": "vitest run",
+    "didac:dev": "vite --config didac/vite.config.ts",
+    "didac:build": "tsc --noEmit -p didac/tsconfig.json && vite build --config didac/vite.config.ts",
+    "didac:preview": "vite preview --config didac/vite.config.ts --port 4174"
   },
   "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/noto-sans-devanagari": "^5.3.0",
@@ -30,6 +34,7 @@
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.48.0",
     "motion": "^13.4.2",
+    "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
@@ -39,12 +44,14 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.1"
   }
 }

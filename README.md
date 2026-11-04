@@ -53,3 +53,7 @@ Vite · React 19 · TypeScript (strict) · Tailwind v4 · Radix · zustand (+Ind
 | `node scripts/video_tracks.mjs` | Precompute face tracks for every clip in `public/media/video/` |
 | `node scripts/shot.mjs <dir> role:/path ...` | Screenshots per role (dev helper) |
 | `node scripts/eval.mjs "<expr on s>"` | Evaluate an expression against the live store (dev helper) |
+
+## DIDAC booth demo (PWA)
+
+A second, installable app lives in `didac/` — see [docs/DIDAC.md](docs/DIDAC.md).

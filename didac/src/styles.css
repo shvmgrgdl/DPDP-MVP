@@ -1,0 +1,38 @@
+@import "tailwindcss";
+@import "@fontsource-variable/dm-sans";
+
+/* DPDPA for Schools — warm paper, navy, gold, DM Sans */
+@theme {
+  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-paper: #faf6ee;
+  --color-card: #ffffff;
+  --color-sand: #f1ebdd;
+  --color-line: #e6dfcf;
+  --color-ink: #14213d;
+  --color-ink-2: #3d4663;
+  --color-ink-3: #636a82;
+  --color-navy: #14213d;
+  --color-navy-2: #1f3158;
+  --color-gold: #c8921a;
+  --color-gold-50: #fbf1d8;
+  --color-ok: #0f6b4a;
+  --color-ok-bg: #e2f3ea;
+  --color-warn: #8a5300;
+  --color-warn-bg: #fdefd2;
+  --color-risk: #b42318;
+  --color-risk-bg: #fde6e3;
+  --color-info: #1d4ed8;
+  --color-info-bg: #e6edff;
+  --shadow-card: 0 1px 2px rgba(20,33,61,.05), 0 12px 24px rgba(20,33,61,.06);
+}
+@layer base {
+  html, body, #root { min-height: 100%; }
+  body { @apply bg-paper text-ink font-sans antialiased; -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }
+  button { cursor: pointer; }
+}
+.card { @apply rounded-2xl border border-line bg-card; box-shadow: var(--shadow-card); }
+.eyebrow { @apply text-[11px] font-bold uppercase tracking-[.14em] text-ink-3; }
+@media print { .no-print { display: none !important; } }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+.pop { animation: pop .4s ease both; }
